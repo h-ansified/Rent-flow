@@ -9,6 +9,13 @@ export const users = pgTable("users", {
   username: text("username").notNull().unique(),
   email: text("email").notNull().unique(),
   password: text("password").notNull(),
+  firstName: text("first_name"),
+  lastName: text("last_name"),
+  phone: text("phone"),
+  companyName: text("company_name"),
+  businessEmail: text("business_email"),
+  businessAddress: text("business_address"),
+  currency: text("currency").default("KES"),
   profilePhotoUrl: text("profile_photo_url"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
@@ -24,10 +31,18 @@ const passwordSchema = z.string()
 export const insertUserSchema = createInsertSchema(users, {
   email: z.string().email("Invalid email address"),
   password: passwordSchema,
+  currency: z.string().optional(),
 }).pick({
   username: true,
   email: true,
   password: true,
+  firstName: true,
+  lastName: true,
+  phone: true,
+  companyName: true,
+  businessEmail: true,
+  businessAddress: true,
+  currency: true,
 });
 
 export type InsertUser = z.infer<typeof insertUserSchema>;
@@ -90,7 +105,9 @@ export const payments = pgTable("payments", {
   dueDate: text("due_date").notNull(),
   paidDate: text("paid_date"),
   status: text("status").notNull().default("pending"), // paid, pending, overdue
-  method: text("method"), // bank_transfer, check, cash, online
+  method: text("method"), // bank_transfer, check, cash, m_pesa, online
+  reference: text("reference"), // logic: transaction code for m-pesa/bank
+  notes: text("notes"),
 });
 
 export const insertPaymentSchema = createInsertSchema(payments).omit({ id: true, userId: true });

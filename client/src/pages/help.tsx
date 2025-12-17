@@ -25,19 +25,19 @@ const faqs = [
   },
   {
     question: "How do I record a rent payment?",
-    answer: "Go to the Payments page and find the pending payment in the table. Click 'Record Payment' to confirm the payment has been received. The status will update to 'Paid' automatically.",
+    answer: "Go to the Payments page and find the pending payment in the table. Click 'Record Payment' to confirm. You can now specify the payment method (including M-Pesa or Bank Transfer) and add a transaction reference code.",
   },
   {
     question: "How do I create a maintenance request?",
     answer: "On the Maintenance page, click 'New Request'. Select the property, describe the issue, choose a priority level and category, then submit. The request will appear in the 'New' column.",
   },
   {
-    question: "How do I add a new tenant?",
-    answer: "Go to the Tenants page and click 'Add Tenant'. Fill in their personal information, select the property and unit, set the lease dates and rent amount, then click 'Add Tenant'.",
+    question: "How do I contact a tenant?",
+    answer: "Go to the Tenants page. Click the three-dot menu next to a tenant's name. You can directly 'Send Email' or 'Call Tenant' from there, or view their full details.",
   },
   {
-    question: "How do I track lease expirations?",
-    answer: "The Dashboard shows upcoming lease expirations in the 'Expiring Leases' section. You can also view all tenant lease dates on the Tenants page.",
+    question: "How do I change my currency settings?",
+    answer: "Visit the Settings page. In the 'Preferences' section, you can select your preferred currency (e.g., KES, USD) which will be used across the dashboard.",
   },
   {
     question: "How do I change my notification settings?",
@@ -133,30 +133,30 @@ export default function Help() {
                 <MessageCircle className="h-5 w-5 text-accent-foreground" />
               </div>
               <div>
-                <h3 className="font-medium text-sm">Live Chat</h3>
-                <p className="text-xs text-muted-foreground">Available 9am-6pm EST</p>
+                <h3 className="font-medium text-sm">WhatsApp</h3>
+                <p className="text-xs text-muted-foreground">Chat with us directly</p>
               </div>
             </div>
-            <div className="flex items-center gap-4 p-4 rounded-md bg-muted/50">
+            <a href="mailto:hanmw009@gmail.com" className="flex items-center gap-4 p-4 rounded-md bg-muted/50 hover:bg-muted transition-colors">
               <div className="h-10 w-10 rounded-full bg-accent flex items-center justify-center">
                 <Mail className="h-5 w-5 text-accent-foreground" />
               </div>
               <div>
                 <h3 className="font-medium text-sm">Email Us</h3>
-                <p className="text-xs text-muted-foreground">support@propertypro.com</p>
+                <p className="text-xs text-muted-foreground">hanmw009@gmail.com</p>
               </div>
-            </div>
-            <div className="flex items-center gap-4 p-4 rounded-md bg-muted/50">
+            </a>
+            <a href="tel:+254717517114" className="flex items-center gap-4 p-4 rounded-md bg-muted/50 hover:bg-muted transition-colors">
               <div className="h-10 w-10 rounded-full bg-accent flex items-center justify-center">
                 <Phone className="h-5 w-5 text-accent-foreground" />
               </div>
               <div>
                 <h3 className="font-medium text-sm">Call Us</h3>
-                <p className="text-xs text-muted-foreground">1-800-PROPERTY</p>
+                <p className="text-xs text-muted-foreground">+254 717517114</p>
               </div>
-            </div>
+            </a>
           </div>
-          
+
           <div className="mt-6 flex justify-center">
             <Button data-testid="button-submit-ticket">
               <MessageCircle className="h-4 w-4 mr-2" />
@@ -165,6 +165,6 @@ export default function Help() {
           </div>
         </CardContent>
       </Card>
-    </div>
+    </div >
   );
 }

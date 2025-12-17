@@ -61,7 +61,7 @@ function PaymentStatusBadge({ status }: { status: string }) {
 
 function PaymentMethodBadge({ method }: { method: string | null }) {
   if (!method) return <span className="text-muted-foreground">-</span>;
-  
+
   const methodConfig: Record<string, { label: string; icon: React.ElementType }> = {
     bank_transfer: { label: "Bank Transfer", icon: Banknote },
     check: { label: "Check", icon: CreditCard },
@@ -128,6 +128,10 @@ export default function Payments() {
   const [selectedPayment, setSelectedPayment] = useState<PaymentWithDetails | null>(null);
   const { toast } = useToast();
 
+  const [method, setMethod] = useState<string>("m_pesa");
+  const [reference, setReference] = useState<string>("");
+  const [notes, setNotes] = useState<string>("");
+
   const { data: payments, isLoading } = useQuery<PaymentWithDetails[]>({
     queryKey: ["/api/payments"],
   });
@@ -137,13 +141,17 @@ export default function Payments() {
       return apiRequest("PATCH", `/api/payments/${paymentId}`, {
         status: "paid",
         paidDate: new Date().toISOString().split("T")[0],
-        method: "online",
+        method,
+        reference,
+        notes,
       });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/payments"] });
       queryClient.invalidateQueries({ queryKey: ["/api/dashboard"] });
       setSelectedPayment(null);
+      setReference("");
+      setNotes("");
       toast({
         title: "Payment recorded",
         description: "The payment has been marked as paid.",
@@ -268,6 +276,9 @@ export default function Payments() {
                     <TableCell>{payment.dueDate}</TableCell>
                     <TableCell>
                       <PaymentMethodBadge method={payment.method} />
+                      {payment.reference && (
+                        <div className="text-xs text-muted-foreground">{payment.reference}</div>
+                      )}
                     </TableCell>
                     <TableCell>
                       <PaymentStatusBadge status={payment.status} />
@@ -320,22 +331,49 @@ export default function Payments() {
                   <span className="font-medium">{selectedPayment.tenantName}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-muted-foreground">Property</span>
-                  <span className="font-medium">{selectedPayment.propertyName}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Amount</span>
+                  <span className="text-muted-foreground">Amount Due</span>
                   <span className="font-medium text-lg">${selectedPayment.amount.toLocaleString()}</span>
                 </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Due Date</span>
-                  <span className="font-medium">{selectedPayment.dueDate}</span>
-                </div>
               </div>
-              <p className="text-sm text-muted-foreground">
-                Confirm that you have received this payment. This action cannot be undone.
-              </p>
-              <div className="flex justify-end gap-3">
+
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Payment Method</label>
+                <Select value={method} onValueChange={setMethod}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="m_pesa">M-Pesa</SelectItem>
+                    <SelectItem value="bank_transfer">Bank Transfer</SelectItem>
+                    <SelectItem value="cash">Cash</SelectItem>
+                    <SelectItem value="check">Check</SelectItem>
+                    <SelectItem value="online">Online</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-sm font-medium">
+                  Reference / Trans ID
+                  {(method === 'm_pesa' || method === 'bank_transfer') && <span className="text-red-500">*</span>}
+                </label>
+                <Input
+                  placeholder={method === 'm_pesa' ? "e.g. QHB456..." : "Transaction Ref"}
+                  value={reference}
+                  onChange={(e) => setReference(e.target.value)}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Notes (Optional)</label>
+                <Input
+                  placeholder="Additional details..."
+                  value={notes}
+                  onChange={(e) => setNotes(e.target.value)}
+                />
+              </div>
+
+              <div className="flex justify-end gap-3 pt-2">
                 <Button variant="outline" onClick={() => setSelectedPayment(null)} data-testid="button-cancel-payment">
                   Cancel
                 </Button>

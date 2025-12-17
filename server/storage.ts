@@ -34,6 +34,15 @@ class DatabaseStorage {
     return user;
   }
 
+  async updateUser(id: string, updates: Partial<User>): Promise<User | undefined> {
+    const [user] = await db
+      .update(users)
+      .set(updates)
+      .where(eq(users.id, id))
+      .returning();
+    return user;
+  }
+
   // ===================
   // PROPERTY METHODS
   // ===================
@@ -354,17 +363,46 @@ class DatabaseStorage {
   }
 
   async getRevenueData(userId: string): Promise<RevenueData[]> {
-    // This would ideally come from historical data
-    // For now, return placeholder data filtered by user
-    // In production, you'd calculate this from actual payment/expense records
-    return [
-      { month: "Jul", revenue: 68500, expenses: 12400 },
-      { month: "Aug", revenue: 71200, expenses: 15800 },
-      { month: "Sep", revenue: 74800, expenses: 11200 },
-      { month: "Oct", revenue: 76400, expenses: 18600 },
-      { month: "Nov", revenue: 78200, expenses: 14200 },
-      { month: "Dec", revenue: 82100, expenses: 16800 },
-    ];
+    const monthlyData: Record<string, number> = {};
+    const months: string[] = [];
+
+    // Initialize last 6 months
+    for (let i = 5; i >= 0; i--) {
+      const d = new Date();
+      d.setMonth(d.getMonth() - i);
+      const monthName = d.toLocaleString('default', { month: 'short' });
+      months.push(monthName);
+      monthlyData[monthName] = 0;
+    }
+
+    // Fetch paid payments
+    const paidPayments = await db
+      .select({
+        amount: payments.amount,
+        paidDate: payments.paidDate,
+      })
+      .from(payments)
+      .where(and(
+        eq(payments.userId, userId),
+        eq(payments.status, "paid")
+      ));
+
+    // Aggregate
+    paidPayments.forEach(p => {
+      if (p.paidDate) {
+        const date = new Date(p.paidDate);
+        const monthName = date.toLocaleString('default', { month: 'short' });
+        if (monthlyData[monthName] !== undefined) {
+          monthlyData[monthName] += p.amount;
+        }
+      }
+    });
+
+    return months.map(month => ({
+      month,
+      revenue: monthlyData[month],
+      expenses: monthlyData[month] * 0.1, // Estimated 10% expenses for now
+    }));
   }
 
   async getRecentActivities(userId: string): Promise<Activity[]> {

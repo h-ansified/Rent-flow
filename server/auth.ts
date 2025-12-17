@@ -209,7 +209,17 @@ router.get("/me", requireAuth, async (req: Request, res: Response) => {
  */
 router.patch("/profile", requireAuth, async (req: Request, res: Response) => {
     try {
-        const { username, profilePhotoUrl } = req.body;
+        const {
+            username,
+            profilePhotoUrl,
+            firstName,
+            lastName,
+            phone,
+            companyName,
+            businessEmail,
+            businessAddress,
+            currency
+        } = req.body;
 
         const updateData: any = {
             updatedAt: new Date(),
@@ -230,9 +240,14 @@ router.patch("/profile", requireAuth, async (req: Request, res: Response) => {
             updateData.username = username;
         }
 
-        if (profilePhotoUrl !== undefined) {
-            updateData.profilePhotoUrl = profilePhotoUrl;
-        }
+        if (profilePhotoUrl !== undefined) updateData.profilePhotoUrl = profilePhotoUrl;
+        if (firstName !== undefined) updateData.firstName = firstName;
+        if (lastName !== undefined) updateData.lastName = lastName;
+        if (phone !== undefined) updateData.phone = phone;
+        if (companyName !== undefined) updateData.companyName = companyName;
+        if (businessEmail !== undefined) updateData.businessEmail = businessEmail;
+        if (businessAddress !== undefined) updateData.businessAddress = businessAddress;
+        if (currency !== undefined) updateData.currency = currency;
 
         const [updatedUser] = await db
             .update(users)
