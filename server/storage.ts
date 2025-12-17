@@ -140,6 +140,16 @@ class DatabaseStorage {
         eq(properties.userId, userId)
       ));
 
+    // Create initial pending payment (Auto-billing)
+    await db.insert(payments).values({
+      userId,
+      tenantId: tenant.id,
+      propertyId: tenant.propertyId,
+      amount: tenant.rentAmount,
+      dueDate: tenant.leaseStart, // First payment due on lease start
+      status: "pending",
+    });
+
     return tenant;
   }
 
@@ -182,7 +192,22 @@ class DatabaseStorage {
   // PAYMENT METHODS
   // ===================
 
+  private async updateOverduePayments(userId: string): Promise<void> {
+    const now = new Date().toISOString().split("T")[0];
+    await db
+      .update(payments)
+      .set({ status: "overdue" })
+      .where(
+        and(
+          eq(payments.userId, userId),
+          eq(payments.status, "pending"),
+          sql`${payments.dueDate} < ${now}`
+        )
+      );
+  }
+
   async getAllPayments(userId: string): Promise<(Payment & { tenantName: string; propertyName: string })[]> {
+    await this.updateOverduePayments(userId);
     const result = await db
       .select({
         payment: payments,
@@ -319,6 +344,7 @@ class DatabaseStorage {
   // ===================
 
   async getDashboardMetrics(userId: string): Promise<DashboardMetrics> {
+    await this.updateOverduePayments(userId);
     // Get counts and sums using SQL aggregation
     const [propertyStats] = await db
       .select({
@@ -366,10 +392,10 @@ class DatabaseStorage {
     const monthlyData: Record<string, number> = {};
     const months: string[] = [];
 
-    // Initialize last 6 months
+    // Initialize last 6 months based on current server time
+    const now = new Date();
     for (let i = 5; i >= 0; i--) {
-      const d = new Date();
-      d.setMonth(d.getMonth() - i);
+      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
       const monthName = d.toLocaleString('default', { month: 'short' });
       months.push(monthName);
       monthlyData[monthName] = 0;
@@ -387,11 +413,13 @@ class DatabaseStorage {
         eq(payments.status, "paid")
       ));
 
-    // Aggregate
+    // Aggregate revenue by month
     paidPayments.forEach(p => {
       if (p.paidDate) {
+        // paidDate is stored as YYYY-MM-DD
         const date = new Date(p.paidDate);
         const monthName = date.toLocaleString('default', { month: 'short' });
+        // Only count if it's within our 6-month window
         if (monthlyData[monthName] !== undefined) {
           monthlyData[monthName] += p.amount;
         }
@@ -460,6 +488,7 @@ class DatabaseStorage {
   async getUpcomingPayments(
     userId: string
   ): Promise<(Payment & { tenantName: string; propertyName: string })[]> {
+    await this.updateOverduePayments(userId);
     const result = await db
       .select({
         payment: payments,

@@ -35,10 +35,12 @@ import {
   TrendingUp,
   CreditCard,
   Banknote,
+  Plus,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
-import type { Payment } from "@shared/schema";
+import { Textarea } from "@/components/ui/textarea";
+import type { Payment, Tenant } from "@shared/schema";
 
 type PaymentWithDetails = Payment & { tenantName: string; propertyName: string };
 
@@ -132,8 +134,17 @@ export default function Payments() {
   const [reference, setReference] = useState<string>("");
   const [notes, setNotes] = useState<string>("");
 
+  const [isNewDialogOpen, setIsNewDialogOpen] = useState(false);
+  const [newPaymentTenantId, setNewPaymentTenantId] = useState<string>("");
+  const [newPaymentAmount, setNewPaymentAmount] = useState<string>("");
+  const [newPaymentDueDate, setNewPaymentDueDate] = useState<string>("");
+
   const { data: payments, isLoading } = useQuery<PaymentWithDetails[]>({
     queryKey: ["/api/payments"],
+  });
+
+  const { data: tenants } = useQuery<Tenant[]>({
+    queryKey: ["/api/tenants"],
   });
 
   const markPaidMutation = useMutation({
@@ -166,6 +177,36 @@ export default function Payments() {
     },
   });
 
+  const createPaymentMutation = useMutation({
+    mutationFn: async (data: any) => {
+      const tenant = tenants?.find(t => t.id === data.tenantId);
+      return apiRequest("POST", "/api/payments", {
+        ...data,
+        propertyId: tenant?.propertyId,
+        status: "pending",
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/payments"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/dashboard"] });
+      setIsNewDialogOpen(false);
+      setNewPaymentTenantId("");
+      setNewPaymentAmount("");
+      setNewPaymentDueDate("");
+      toast({
+        title: "Payment record created",
+        description: "A new pending payment has been recorded.",
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Failed to create payment record.",
+        variant: "destructive",
+      });
+    },
+  });
+
   const filteredPayments = payments?.filter((payment) => {
     const matchesSearch = payment.tenantName.toLowerCase().includes(searchQuery.toLowerCase()) ||
       payment.propertyName.toLowerCase().includes(searchQuery.toLowerCase());
@@ -181,9 +222,15 @@ export default function Payments() {
 
   return (
     <div className="p-6 space-y-6">
-      <div>
-        <h1 className="text-3xl font-semibold" data-testid="text-page-title">Payments</h1>
-        <p className="text-muted-foreground mt-1">Track and manage rent payments</p>
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div>
+          <h1 className="text-3xl font-semibold" data-testid="text-page-title">Payments</h1>
+          <p className="text-muted-foreground mt-1">Track and manage rent payments</p>
+        </div>
+        <Button onClick={() => setIsNewDialogOpen(true)} data-testid="button-new-payment">
+          <Plus className="h-4 w-4 mr-2" />
+          Record Payment
+        </Button>
       </div>
 
       {/* Metrics */}
@@ -318,6 +365,7 @@ export default function Payments() {
       </Card>
 
       {/* Record Payment Dialog */}
+      {/* Record Payment Dialog (Marking existing as paid) */}
       <Dialog open={!!selectedPayment} onOpenChange={() => setSelectedPayment(null)}>
         <DialogContent>
           <DialogHeader>
@@ -389,6 +437,67 @@ export default function Payments() {
               </div>
             </div>
           )}
+        </DialogContent>
+      </Dialog>
+
+      {/* New Payment Dialog (Creating new record) */}
+      <Dialog open={isNewDialogOpen} onOpenChange={setIsNewDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>New Payment Record</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Tenant</label>
+              <Select value={newPaymentTenantId} onValueChange={setNewPaymentTenantId}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select tenant" />
+                </SelectTrigger>
+                <SelectContent>
+                  {tenants?.map(tenant => (
+                    <SelectItem key={tenant.id} value={tenant.id}>
+                      {tenant.firstName} {tenant.lastName}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Amount ($)</label>
+              <Input
+                type="number"
+                placeholder="0.00"
+                value={newPaymentAmount}
+                onChange={(e) => setNewPaymentAmount(e.target.value)}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Due Date</label>
+              <Input
+                type="date"
+                value={newPaymentDueDate}
+                onChange={(e) => setNewPaymentDueDate(e.target.value)}
+              />
+            </div>
+
+            <div className="flex justify-end gap-3 pt-2">
+              <Button variant="outline" onClick={() => setIsNewDialogOpen(false)}>
+                Cancel
+              </Button>
+              <Button
+                onClick={() => createPaymentMutation.mutate({
+                  tenantId: newPaymentTenantId,
+                  amount: parseFloat(newPaymentAmount),
+                  dueDate: newPaymentDueDate,
+                })}
+                disabled={createPaymentMutation.isPending || !newPaymentTenantId || !newPaymentAmount || !newPaymentDueDate}
+              >
+                {createPaymentMutation.isPending ? "Sharing..." : "Create Record"}
+              </Button>
+            </div>
+          </div>
         </DialogContent>
       </Dialog>
     </div>
