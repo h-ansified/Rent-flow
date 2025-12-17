@@ -64,7 +64,8 @@ router.post("/signup", async (req: Request, res: Response) => {
             });
         }
 
-        const { username, email, password } = parsed.data;
+        const { username, password } = parsed.data;
+        const email = parsed.data.email.toLowerCase();
 
         // Check if user already exists
         const existingUser = await db
@@ -129,20 +130,22 @@ router.post("/login", async (req: Request, res: Response) => {
             return res.status(400).json({ error: "Invalid email format" });
         }
 
-        // Find user by email
+        // Find user by email (case-insensitive)
         const [user] = await db
             .select()
             .from(users)
-            .where(eq(users.email, email))
+            .where(eq(users.email, email.toLowerCase()))
             .limit(1);
 
         if (!user) {
+            console.log(`Login failed: User not found for email ${email}`);
             return res.status(401).json({ error: "Invalid email or password" });
         }
 
         // Verify password
         const isValid = await verifyPassword(password, user.password);
         if (!isValid) {
+            console.log(`Login failed: Invalid password for email ${email}`);
             return res.status(401).json({ error: "Invalid email or password" });
         }
 

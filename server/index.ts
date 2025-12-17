@@ -6,9 +6,9 @@ import { registerRoutes } from "./routes";
 import { serveStatic } from "./static";
 import { createServer } from "http";
 import { pool, db } from "./db";
-import { users } from "@shared/schema";
+import { users, properties, tenants, payments, maintenanceRequests } from "@shared/schema";
 import { hashPassword } from "./auth";
-import { eq } from "drizzle-orm";
+import { eq, and } from "drizzle-orm";
 
 const app = express();
 const httpServer = createServer(app);
@@ -100,19 +100,37 @@ app.use((req, res, next) => {
   next();
 });
 
+async function lowercaseExistingEmails() {
+  try {
+    const allUsers = await db.select().from(users);
+    for (const user of allUsers) {
+      if (user.email !== user.email.toLowerCase()) {
+        await db.update(users)
+          .set({ email: user.email.toLowerCase() })
+          .where(eq(users.id, user.id));
+        log(`Lowercased email for user: ${user.username}`);
+      }
+    }
+  } catch (error) {
+    log("Email lowercasing skipped: " + (error instanceof Error ? error.message : String(error)));
+  }
+}
+
 async function seedDemoUser() {
   try {
     const demoEmail = "demo@rentflow.app";
-    // Check if user exists (this will fail if DB columns are missing, but it's caught)
-    const [existing] = await db
+    const demoPassword = "Demo123!";
+    const hashedPassword = await hashPassword(demoPassword);
+
+    // 1. Create or Update Demo User
+    let [demoUser] = await db
       .select()
       .from(users)
       .where(eq(users.email, demoEmail))
       .limit(1);
 
-    if (!existing) {
-      const hashedPassword = await hashPassword("Demo123!");
-      await db.insert(users).values({
+    if (!demoUser) {
+      [demoUser] = await db.insert(users).values({
         username: "demo_user",
         email: demoEmail,
         password: hashedPassword,
@@ -120,22 +138,157 @@ async function seedDemoUser() {
         lastName: "User",
         companyName: "Demo Properties Ltd",
         currency: "KSH",
-      });
+      }).returning();
       log("Demo user created successfully: demo@rentflow.app");
     } else {
-      // Update currency just in case
-      await db.update(users).set({ currency: "KSH" }).where(eq(users.email, demoEmail));
-      log("Demo user already exists (KSH branding applied)");
+      // Force password and currency to ensure login always works
+      await db.update(users).set({
+        password: hashedPassword,
+        currency: "KSH"
+      }).where(eq(users.email, demoEmail));
+      log("Demo user updated (password & currency synced)");
     }
+
+    // 2. Check for existing data
+    const existingProperties = await db.select().from(properties).where(eq(properties.userId, demoUser.id)).limit(1);
+    if (existingProperties.length > 0) {
+      log("Demo data already exists, skipping property/tenant seeding");
+      return;
+    }
+
+    log("Seeding default demo data...");
+
+    // 3. Seed Properties
+    const [prop1] = await db.insert(properties).values({
+      userId: demoUser.id,
+      name: "Ocean View Apartments",
+      address: "123 Beach Road",
+      city: "Mombasa",
+      state: "Coast",
+      zipCode: "80100",
+      type: "apartment",
+      units: 10,
+      occupiedUnits: 2,
+      monthlyRent: 45000,
+    }).returning();
+
+    const [prop2] = await db.insert(properties).values({
+      userId: demoUser.id,
+      name: "Heights Residency",
+      address: "45 Ngong Road",
+      city: "Nairobi",
+      state: "Nairobi",
+      zipCode: "00100",
+      type: "condo",
+      units: 5,
+      occupiedUnits: 1,
+      monthlyRent: 75000,
+    }).returning();
+
+    // 4. Seed Tenants
+    const [tenant1] = await db.insert(tenants).values({
+      userId: demoUser.id,
+      propertyId: prop1.id,
+      firstName: "John",
+      lastName: "Doe",
+      email: "john@example.com",
+      phone: "+254712345678",
+      unit: "A1",
+      leaseStart: "2023-01-01",
+      leaseEnd: "2024-01-01",
+      rentAmount: 45000,
+      status: "active",
+    }).returning();
+
+    const [tenant2] = await db.insert(tenants).values({
+      userId: demoUser.id,
+      propertyId: prop1.id,
+      firstName: "Jane",
+      lastName: "Smith",
+      email: "jane@example.com",
+      phone: "+254722345678",
+      unit: "B2",
+      leaseStart: "2023-06-01",
+      leaseEnd: "2024-06-01",
+      rentAmount: 45000,
+      status: "active",
+    }).returning();
+
+    const [tenant3] = await db.insert(tenants).values({
+      userId: demoUser.id,
+      propertyId: prop2.id,
+      firstName: "Alice",
+      lastName: "Wanjiku",
+      email: "alice@example.com",
+      phone: "+254733345678",
+      unit: "Pethouse",
+      leaseStart: "2023-03-01",
+      leaseEnd: "2024-03-01",
+      rentAmount: 75000,
+      status: "active",
+    }).returning();
+
+    // 5. Seed Payments
+    const today = new Date();
+    const lastMonth = new Date(today.getFullYear(), today.getMonth() - 1, 5).toISOString().split('T')[0];
+    const thisMonth = new Date(today.getFullYear(), today.getMonth(), 5).toISOString().split('T')[0];
+
+    await db.insert(payments).values([
+      {
+        userId: demoUser.id,
+        tenantId: tenant1.id,
+        propertyId: prop1.id,
+        amount: 45000,
+        paidAmount: 45000,
+        dueDate: lastMonth,
+        paidDate: lastMonth,
+        status: "paid",
+        method: "m_pesa",
+        reference: "QTY789XCV",
+      },
+      {
+        userId: demoUser.id,
+        tenantId: tenant2.id,
+        propertyId: prop1.id,
+        amount: 45000,
+        paidAmount: 20000,
+        dueDate: thisMonth,
+        status: "pending",
+        notes: "Partial payment made",
+      },
+      {
+        userId: demoUser.id,
+        tenantId: tenant3.id,
+        propertyId: prop2.id,
+        amount: 75000,
+        paidAmount: 0,
+        dueDate: lastMonth,
+        status: "overdue",
+      }
+    ]);
+
+    // 6. Seed Maintenance
+    await db.insert(maintenanceRequests).values({
+      userId: demoUser.id,
+      propertyId: prop1.id,
+      tenantId: tenant1.id,
+      title: "Leaky Faucet",
+      description: "Kitchen faucet has a steady drip.",
+      priority: "medium",
+      status: "new",
+      category: "plumbing",
+      createdAt: today.toISOString().split('T')[0],
+    });
+
+    log("Demo data seeded successfully.");
   } catch (error) {
-    // If this fails (e.g. missing columns), we just log it and continue
-    // It's vital that this doesn't crash the server startup
-    console.warn("Demo seeding skipped/failed (possibly missing DB columns):", error instanceof Error ? error.message : error);
+    console.warn("Demo seeding failed:", error instanceof Error ? error.message : error);
   }
 }
 
 (async () => {
   try {
+    await lowercaseExistingEmails();
     await seedDemoUser();
     await registerRoutes(httpServer, app);
   } catch (err) {
