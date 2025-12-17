@@ -100,7 +100,41 @@ app.use((req, res, next) => {
   next();
 });
 
+import { db } from "./db";
+import { users } from "@shared/schema";
+import { hashPassword } from "./auth";
+import { eq } from "drizzle-orm";
+
+async function seedDemoUser() {
+  try {
+    const demoEmail = "demo@rentflow.app";
+    const [existing] = await db
+      .select()
+      .from(users)
+      .where(eq(users.email, demoEmail))
+      .limit(1);
+
+    if (!existing) {
+      const hashedPassword = await hashPassword("Demo123!");
+      await db.insert(users).values({
+        username: "demo_user",
+        email: demoEmail,
+        password: hashedPassword,
+        firstName: "Demo",
+        lastName: "User",
+        companyName: "Demo Properties Ltd",
+      });
+      log("Demo user created successfully: demo@rentflow.app");
+    } else {
+      log("Demo user already exists");
+    }
+  } catch (error) {
+    console.error("Failed to seed demo user:", error);
+  }
+}
+
 (async () => {
+  await seedDemoUser();
   await registerRoutes(httpServer, app);
 
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {

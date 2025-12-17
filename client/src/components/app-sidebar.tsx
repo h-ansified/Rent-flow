@@ -1,4 +1,5 @@
 import { Link, useLocation } from "wouter";
+import { useAuth, useLogout } from "@/hooks/use-auth";
 import {
   Sidebar,
   SidebarContent,
@@ -19,8 +20,10 @@ import {
   Wrench,
   Settings,
   HelpCircle,
+  LogOut,
 } from "lucide-react";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Button } from "@/components/ui/button";
 
 const mainNavItems = [
   {
@@ -65,6 +68,27 @@ const secondaryNavItems = [
 
 export function AppSidebar() {
   const [location] = useLocation();
+  const { user } = useAuth();
+  const logoutMutation = useLogout();
+
+  const handleLogout = () => {
+    logoutMutation.mutate();
+  };
+
+  const getInitials = (name: string) => {
+    return name
+      .split(' ')
+      .map(part => part[0])
+      .join('')
+      .toUpperCase()
+      .substring(0, 2);
+  };
+
+  const displayName = user?.firstName && user?.lastName
+    ? `${user.firstName} ${user.lastName}`
+    : user?.email?.split('@')[0] || "User";
+
+  const displayRole = user?.companyName || "Landlord";
 
   return (
     <Sidebar>
@@ -119,6 +143,12 @@ export function AppSidebar() {
                   </SidebarMenuButton>
                 </SidebarMenuItem>
               ))}
+              <SidebarMenuItem>
+                <SidebarMenuButton onClick={handleLogout} data-testid="button-logout">
+                  <LogOut className="h-4 w-4" />
+                  <span>Log Out</span>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
@@ -127,11 +157,13 @@ export function AppSidebar() {
       <SidebarFooter className="p-4">
         <div className="flex items-center gap-3">
           <Avatar>
-            <AvatarFallback className="bg-accent text-accent-foreground">JD</AvatarFallback>
+            <AvatarFallback className="bg-accent text-accent-foreground">
+              {getInitials(displayName)}
+            </AvatarFallback>
           </Avatar>
-          <div className="flex flex-col">
-            <span className="text-sm font-medium" data-testid="text-user-name">John Davis</span>
-            <span className="text-xs text-muted-foreground">Property Manager</span>
+          <div className="flex flex-col overflow-hidden">
+            <span className="text-sm font-medium truncate" data-testid="text-user-name">{displayName}</span>
+            <span className="text-xs text-muted-foreground truncate">{displayRole}</span>
           </div>
         </div>
       </SidebarFooter>

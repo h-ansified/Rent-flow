@@ -128,6 +128,7 @@ export const maintenanceRequests = pgTable("maintenance_requests", {
   createdAt: text("created_at").notNull(),
   completedAt: text("completed_at"),
   assignedTo: text("assigned_to"),
+  cost: real("cost"), // Cost of maintenance work
 });
 
 export const insertMaintenanceRequestSchema = createInsertSchema(maintenanceRequests).omit({ id: true, userId: true });

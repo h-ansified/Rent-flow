@@ -365,11 +365,13 @@ export default function Payments() {
               </div>
 
               <div className="space-y-2">
-                <label className="text-sm font-medium">Notes (Optional)</label>
-                <Input
-                  placeholder="Additional details..."
+                <label className="text-sm font-medium">Notes / SMS Message</label>
+                <Textarea
+                  placeholder="Paste M-Pesa message or add custom notes..."
                   value={notes}
                   onChange={(e) => setNotes(e.target.value)}
+                  className="resize-none"
+                  rows={4}
                 />
               </div>
 

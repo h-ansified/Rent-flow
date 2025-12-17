@@ -74,6 +74,7 @@ const maintenanceFormSchema = z.object({
   description: z.string().min(1, "Description is required"),
   priority: z.string().min(1, "Priority is required"),
   category: z.string().min(1, "Category is required"),
+  cost: z.number().optional(),
 });
 
 type MaintenanceFormValues = z.infer<typeof maintenanceFormSchema>;
@@ -101,11 +102,11 @@ const statusColors: Record<string, string> = {
   completed: "border-green-500",
 };
 
-function RequestCard({ 
-  request, 
+function RequestCard({
+  request,
   onStatusChange,
   onDelete
-}: { 
+}: {
   request: MaintenanceWithDetails;
   onStatusChange: (id: string, status: string) => void;
   onDelete: (id: string) => void;
@@ -113,7 +114,7 @@ function RequestCard({
   const CategoryIcon = categoryIcons[request.category] || Wrench;
 
   return (
-    <Card 
+    <Card
       className={`hover-elevate`}
       data-testid={`card-maintenance-${request.id}`}
     >
@@ -155,7 +156,7 @@ function RequestCard({
                   Reopen
                 </DropdownMenuItem>
               )}
-              <DropdownMenuItem 
+              <DropdownMenuItem
                 className="text-destructive"
                 onClick={() => onDelete(request.id)}
               >
@@ -189,6 +190,12 @@ function RequestCard({
               Assigned to: {request.assignedTo}
             </div>
           )}
+          {request.cost && (
+            <div className="flex items-center gap-1.5 text-green-600 font-medium">
+              <CreditCard className="h-3 w-3" />
+              Cost: ${request.cost.toFixed(2)}
+            </div>
+          )}
         </div>
       </CardContent>
     </Card>
@@ -219,15 +226,15 @@ function RequestCardSkeleton() {
   );
 }
 
-function KanbanColumn({ 
-  title, 
-  status, 
-  requests, 
+function KanbanColumn({
+  title,
+  status,
+  requests,
   isLoading,
   onStatusChange,
   onDelete,
-}: { 
-  title: string; 
+}: {
+  title: string;
   status: string;
   requests: MaintenanceWithDetails[];
   isLoading: boolean;
@@ -256,9 +263,9 @@ function KanbanColumn({
           </>
         ) : requests.length > 0 ? (
           requests.map((request) => (
-            <RequestCard 
-              key={request.id} 
-              request={request} 
+            <RequestCard
+              key={request.id}
+              request={request}
               onStatusChange={onStatusChange}
               onDelete={onDelete}
             />
@@ -433,10 +440,10 @@ export default function Maintenance() {
                     <FormItem>
                       <FormLabel>Description</FormLabel>
                       <FormControl>
-                        <Textarea 
-                          placeholder="Describe the issue in detail..." 
+                        <Textarea
+                          placeholder="Describe the issue in detail..."
                           className="resize-none"
-                          {...field} 
+                          {...field}
                           data-testid="input-request-description"
                         />
                       </FormControl>
@@ -519,6 +526,7 @@ export default function Maintenance() {
                       </FormItem>
                     )}
                   />
+
                   <FormField
                     control={form.control}
                     name="priority"
@@ -538,6 +546,27 @@ export default function Maintenance() {
                             <SelectItem value="urgent">Urgent</SelectItem>
                           </SelectContent>
                         </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="cost"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Cost ($) (Optional)</FormLabel>
+                        <FormControl>
+                          <Input
+                            type="number"
+                            min="0"
+                            step="0.01"
+                            placeholder="0.00"
+                            {...field}
+                            onChange={(e) => field.onChange(e.target.valueAsNumber || undefined)}
+                            data-testid="input-request-cost"
+                          />
+                        </FormControl>
                         <FormMessage />
                       </FormItem>
                     )}
