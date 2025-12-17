@@ -201,7 +201,8 @@ class DatabaseStorage {
         and(
           eq(payments.userId, userId),
           eq(payments.status, "pending"),
-          sql`${payments.dueDate} < ${now}`
+          sql`${payments.dueDate} < ${now}`,
+          sql`${payments.amount} > ${payments.paidAmount}`
         )
       );
   }
@@ -249,12 +250,26 @@ class DatabaseStorage {
 
   async updatePayment(
     id: string,
-    updates: Partial<Payment>,
+    updates: Partial<Payment> & { paidAmount?: number },
     userId: string
   ): Promise<Payment | undefined> {
+    // If we are recording a payment, we increment the paidAmount
+    const current = await this.getPayment(id, userId);
+    if (!current) return undefined;
+
+    const newPaidAmount = (current.paidAmount || 0) + (updates.paidAmount || 0);
+    const isCleared = newPaidAmount >= current.amount;
+
+    const finalUpdates: any = {
+      ...updates,
+      paidAmount: newPaidAmount,
+      status: isCleared ? "paid" : (current.dueDate < new Date().toISOString().split("T")[0] ? "overdue" : "pending"),
+      paidDate: isCleared ? (updates.paidDate || new Date().toISOString().split("T")[0]) : current.paidDate
+    };
+
     const [payment] = await db
       .update(payments)
-      .set(updates)
+      .set(finalUpdates)
       .where(and(eq(payments.id, id), eq(payments.userId, userId)))
       .returning();
     return payment;
@@ -401,27 +416,27 @@ class DatabaseStorage {
       monthlyData[monthName] = 0;
     }
 
-    // Fetch paid payments
-    const paidPayments = await db
+    // Fetch all payments with any collections
+    const collections = await db
       .select({
-        amount: payments.amount,
+        paidAmount: payments.paidAmount,
         paidDate: payments.paidDate,
+        dueDate: payments.dueDate, // Fallback if no paidDate yet but partial payment exists
       })
       .from(payments)
       .where(and(
         eq(payments.userId, userId),
-        eq(payments.status, "paid")
+        sql`${payments.paidAmount} > 0`
       ));
 
     // Aggregate revenue by month
-    paidPayments.forEach(p => {
-      if (p.paidDate) {
-        // paidDate is stored as YYYY-MM-DD
-        const date = new Date(p.paidDate);
+    collections.forEach(p => {
+      const dateStr = p.paidDate || p.dueDate;
+      if (dateStr) {
+        const date = new Date(dateStr);
         const monthName = date.toLocaleString('default', { month: 'short' });
-        // Only count if it's within our 6-month window
         if (monthlyData[monthName] !== undefined) {
-          monthlyData[monthName] += p.amount;
+          monthlyData[monthName] += p.paidAmount;
         }
       }
     });

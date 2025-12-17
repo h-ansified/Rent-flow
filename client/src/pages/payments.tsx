@@ -133,6 +133,8 @@ export default function Payments() {
   const [method, setMethod] = useState<string>("m_pesa");
   const [reference, setReference] = useState<string>("");
   const [notes, setNotes] = useState<string>("");
+  const [paidAmount, setPaidAmount] = useState<string>("");
+  const [viewingPayment, setViewingPayment] = useState<PaymentWithDetails | null>(null);
 
   const [isNewDialogOpen, setIsNewDialogOpen] = useState(false);
   const [newPaymentTenantId, setNewPaymentTenantId] = useState<string>("");
@@ -155,6 +157,7 @@ export default function Payments() {
         method,
         reference,
         notes,
+        paidAmount: parseFloat(paidAmount),
       });
     },
     onSuccess: () => {
@@ -163,6 +166,7 @@ export default function Payments() {
       setSelectedPayment(null);
       setReference("");
       setNotes("");
+      setPaidAmount("");
       toast({
         title: "Payment recorded",
         description: "The payment has been marked as paid.",
@@ -237,21 +241,21 @@ export default function Payments() {
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         <MetricCard
           title="Total Received"
-          value={`$${totalReceived.toLocaleString()}`}
+          value={`KSH ${totalReceived.toLocaleString()}`}
           subtitle="This month"
           icon={TrendingUp}
           color="bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400"
         />
         <MetricCard
           title="Pending"
-          value={`$${pendingAmount.toLocaleString()}`}
+          value={`KSH ${pendingAmount.toLocaleString()}`}
           subtitle="Awaiting payment"
           icon={Clock}
           color="bg-yellow-100 dark:bg-yellow-900/30 text-yellow-600 dark:text-yellow-400"
         />
         <MetricCard
           title="Overdue"
-          value={`$${overdueAmount.toLocaleString()}`}
+          value={`KSH ${overdueAmount.toLocaleString()}`}
           subtitle="Past due date"
           icon={AlertCircle}
           color="bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400"
@@ -298,7 +302,9 @@ export default function Payments() {
               <TableRow>
                 <TableHead>Tenant</TableHead>
                 <TableHead>Property</TableHead>
-                <TableHead>Amount</TableHead>
+                <TableHead>Total Rent</TableHead>
+                <TableHead>Paid</TableHead>
+                <TableHead>Balance</TableHead>
                 <TableHead>Due Date</TableHead>
                 <TableHead>Method</TableHead>
                 <TableHead>Status</TableHead>
@@ -319,7 +325,9 @@ export default function Payments() {
                   <TableRow key={payment.id} data-testid={`row-payment-${payment.id}`}>
                     <TableCell className="font-medium">{payment.tenantName}</TableCell>
                     <TableCell>{payment.propertyName}</TableCell>
-                    <TableCell className="font-medium">${payment.amount.toLocaleString()}</TableCell>
+                    <TableCell className="font-medium">KSH {payment.amount.toLocaleString()}</TableCell>
+                    <TableCell className="text-green-600">KSH {(payment.paidAmount || 0).toLocaleString()}</TableCell>
+                    <TableCell className="font-bold text-red-600">KSH {(payment.amount - (payment.paidAmount || 0)).toLocaleString()}</TableCell>
                     <TableCell>{payment.dueDate}</TableCell>
                     <TableCell>
                       <PaymentMethodBadge method={payment.method} />
@@ -331,18 +339,24 @@ export default function Payments() {
                       <PaymentStatusBadge status={payment.status} />
                     </TableCell>
                     <TableCell>
-                      {payment.status !== "paid" && (
+                      <div className="flex flex-col gap-1">
+                        {payment.status !== "paid" && (
+                          <Button
+                            size="sm"
+                            onClick={() => setSelectedPayment(payment)}
+                            data-testid={`button-record-payment-${payment.id}`}
+                          >
+                            Record Payment
+                          </Button>
+                        )}
                         <Button
                           size="sm"
-                          onClick={() => setSelectedPayment(payment)}
-                          data-testid={`button-record-payment-${payment.id}`}
+                          variant="outline"
+                          onClick={() => setViewingPayment(payment)}
                         >
-                          Record Payment
+                          View Details
                         </Button>
-                      )}
-                      {payment.status === "paid" && (
-                        <span className="text-sm text-muted-foreground">Paid {payment.paidDate}</span>
-                      )}
+                      </div>
                     </TableCell>
                   </TableRow>
                 ))
@@ -375,13 +389,27 @@ export default function Payments() {
             <div className="space-y-4">
               <div className="p-4 bg-muted rounded-md space-y-2">
                 <div className="flex justify-between">
-                  <span className="text-muted-foreground">Tenant</span>
-                  <span className="font-medium">{selectedPayment.tenantName}</span>
+                  <span className="text-muted-foreground">Total Amount</span>
+                  <span className="font-medium">KSH {selectedPayment.amount.toLocaleString()}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-muted-foreground">Amount Due</span>
-                  <span className="font-medium text-lg">${selectedPayment.amount.toLocaleString()}</span>
+                  <span className="text-muted-foreground">Already Paid</span>
+                  <span className="font-medium text-green-600">KSH {(selectedPayment.paidAmount || 0).toLocaleString()}</span>
                 </div>
+                <div className="flex justify-between border-t pt-2 mt-2">
+                  <span className="text-muted-foreground font-semibold">Remaining Balance</span>
+                  <span className="font-bold text-lg text-red-600">KSH {(selectedPayment.amount - (selectedPayment.paidAmount || 0)).toLocaleString()}</span>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Payment Amount (KSH)</label>
+                <Input
+                  type="number"
+                  placeholder="Enter amount collected..."
+                  value={paidAmount}
+                  onChange={(e) => setPaidAmount(e.target.value)}
+                />
               </div>
 
               <div className="space-y-2">
@@ -464,7 +492,7 @@ export default function Payments() {
             </div>
 
             <div className="space-y-2">
-              <label className="text-sm font-medium">Amount ($)</label>
+              <label className="text-sm font-medium">Amount (KSH)</label>
               <Input
                 type="number"
                 placeholder="0.00"
@@ -498,6 +526,84 @@ export default function Payments() {
               </Button>
             </div>
           </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* View Payment Details Dialog */}
+      <Dialog open={!!viewingPayment} onOpenChange={() => setViewingPayment(null)}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Payment Details</DialogTitle>
+          </DialogHeader>
+          {viewingPayment && (
+            <div className="space-y-6">
+              <div className="p-4 bg-muted rounded-md space-y-4">
+                <div className="flex justify-between items-center text-sm">
+                  <span className="text-muted-foreground">Tenant</span>
+                  <span className="font-semibold">{viewingPayment.tenantName}</span>
+                </div>
+                <div className="flex justify-between items-center text-sm">
+                  <span className="text-muted-foreground">Property</span>
+                  <span className="font-semibold">{viewingPayment.propertyName}</span>
+                </div>
+                <div className="flex justify-between items-center text-lg border-t pt-2">
+                  <span className="font-medium text-muted-foreground">Total Rent</span>
+                  <span className="font-bold">KSH {viewingPayment.amount.toLocaleString()}</span>
+                </div>
+                <div className="flex justify-between items-center text-lg">
+                  <span className="font-medium text-muted-foreground">Amount Paid</span>
+                  <span className="font-bold text-green-600">KSH {(viewingPayment.paidAmount || 0).toLocaleString()}</span>
+                </div>
+                <div className="flex justify-between items-center text-lg border-t pt-2">
+                  <span className="font-bold">Remaining Balance</span>
+                  <span className="font-extrabold text-red-600">KSH {(viewingPayment.amount - (viewingPayment.paidAmount || 0)).toLocaleString()}</span>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4 text-sm">
+                <div>
+                  <p className="text-muted-foreground mb-1">Due Date</p>
+                  <p className="font-medium">{viewingPayment.dueDate}</p>
+                </div>
+                <div>
+                  <p className="text-muted-foreground mb-1">Status</p>
+                  <PaymentStatusBadge status={viewingPayment.status} />
+                </div>
+                {viewingPayment.paidDate && (
+                  <div>
+                    <p className="text-muted-foreground mb-1">Last Paid On</p>
+                    <p className="font-medium">{viewingPayment.paidDate}</p>
+                  </div>
+                )}
+                {viewingPayment.method && (
+                  <div>
+                    <p className="text-muted-foreground mb-1">Payment Method</p>
+                    <PaymentMethodBadge method={viewingPayment.method} />
+                  </div>
+                )}
+              </div>
+
+              {viewingPayment.reference && (
+                <div className="text-sm">
+                  <p className="text-muted-foreground mb-1">Reference / Transaction ID</p>
+                  <p className="font-mono bg-accent p-2 rounded">{viewingPayment.reference}</p>
+                </div>
+              )}
+
+              {viewingPayment.notes && (
+                <div className="text-sm">
+                  <p className="text-muted-foreground mb-1">Notes</p>
+                  <div className="bg-accent p-3 rounded italic whitespace-pre-wrap">
+                    "{viewingPayment.notes}"
+                  </div>
+                </div>
+              )}
+
+              <div className="flex justify-end">
+                <Button variant="outline" onClick={() => setViewingPayment(null)}>Close</Button>
+              </div>
+            </div>
+          )}
         </DialogContent>
       </Dialog>
     </div>

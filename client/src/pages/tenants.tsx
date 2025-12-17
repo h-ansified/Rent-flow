@@ -354,7 +354,7 @@ export default function Tenants() {
                   name="rentAmount"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Monthly Rent ($)</FormLabel>
+                      <FormLabel>Monthly Rent (KSH)</FormLabel>
                       <FormControl>
                         <Input type="number" min="0" {...field} data-testid="input-tenant-rent" />
                       </FormControl>
@@ -447,7 +447,7 @@ export default function Tenants() {
                     <TableCell>{tenant.propertyName}</TableCell>
                     <TableCell>{tenant.unit || "-"}</TableCell>
                     <TableCell>{tenant.leaseEnd}</TableCell>
-                    <TableCell>${tenant.rentAmount.toLocaleString()}</TableCell>
+                    <TableCell>KSH {tenant.rentAmount.toLocaleString()}</TableCell>
                     <TableCell>
                       <TenantStatusBadge status={tenant.status} />
                     </TableCell>

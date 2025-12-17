@@ -56,13 +56,12 @@ function MetricCard({
         {(subtitle || trendValue) && (
           <div className="flex items-center gap-2 mt-1">
             {trend && trendValue && (
-              <span className={`flex items-center text-xs font-medium ${
-                trend === "up" ? "text-green-600 dark:text-green-400" : 
-                trend === "down" ? "text-red-600 dark:text-red-400" : 
-                "text-muted-foreground"
-              }`}>
-                {trend === "up" ? <TrendingUp className="h-3 w-3 mr-1" /> : 
-                 trend === "down" ? <TrendingDown className="h-3 w-3 mr-1" /> : null}
+              <span className={`flex items-center text-xs font-medium ${trend === "up" ? "text-green-600 dark:text-green-400" :
+                  trend === "down" ? "text-red-600 dark:text-red-400" :
+                    "text-muted-foreground"
+                }`}>
+                {trend === "up" ? <TrendingUp className="h-3 w-3 mr-1" /> :
+                  trend === "down" ? <TrendingDown className="h-3 w-3 mr-1" /> : null}
                 {trendValue}
               </span>
             )}
@@ -97,7 +96,7 @@ function ActivityItem({ activity }: { activity: Activity }) {
     tenant: Users,
   };
   const Icon = iconMap[activity.type];
-  
+
   const colorMap = {
     payment: "bg-green-100 text-green-600 dark:bg-green-900/30 dark:text-green-400",
     maintenance: "bg-orange-100 text-orange-600 dark:bg-orange-900/30 dark:text-orange-400",
@@ -197,7 +196,7 @@ export default function Dashboard() {
             />
             <MetricCard
               title="Monthly Revenue"
-              value={`$${metrics.monthlyRevenue.toLocaleString()}`}
+              value={`KSH ${metrics.monthlyRevenue.toLocaleString()}`}
               subtitle="Total expected rent"
               icon={DollarSign}
               trend="up"
@@ -231,31 +230,31 @@ export default function Dashboard() {
                   <AreaChart data={revenueData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
                     <defs>
                       <linearGradient id="colorRevenue" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="hsl(var(--chart-1))" stopOpacity={0.3}/>
-                        <stop offset="95%" stopColor="hsl(var(--chart-1))" stopOpacity={0}/>
+                        <stop offset="5%" stopColor="hsl(var(--chart-1))" stopOpacity={0.3} />
+                        <stop offset="95%" stopColor="hsl(var(--chart-1))" stopOpacity={0} />
                       </linearGradient>
                       <linearGradient id="colorExpenses" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="hsl(var(--chart-5))" stopOpacity={0.3}/>
-                        <stop offset="95%" stopColor="hsl(var(--chart-5))" stopOpacity={0}/>
+                        <stop offset="5%" stopColor="hsl(var(--chart-5))" stopOpacity={0.3} />
+                        <stop offset="95%" stopColor="hsl(var(--chart-5))" stopOpacity={0} />
                       </linearGradient>
                     </defs>
                     <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-                    <XAxis 
-                      dataKey="month" 
+                    <XAxis
+                      dataKey="month"
                       tick={{ fontSize: 12 }}
                       tickLine={false}
                       axisLine={false}
                       className="fill-muted-foreground"
                     />
-                    <YAxis 
+                    <YAxis
                       tick={{ fontSize: 12 }}
                       tickLine={false}
                       axisLine={false}
                       tickFormatter={(value) => `$${(value / 1000).toFixed(0)}k`}
                       className="fill-muted-foreground"
                     />
-                    <Tooltip 
-                      contentStyle={{ 
+                    <Tooltip
+                      contentStyle={{
                         backgroundColor: "hsl(var(--card))",
                         border: "1px solid hsl(var(--border))",
                         borderRadius: "8px",
@@ -310,8 +309,8 @@ export default function Dashboard() {
                         <Cell key={`cell-${index}`} fill={entry.color} />
                       ))}
                     </Pie>
-                    <Tooltip 
-                      contentStyle={{ 
+                    <Tooltip
+                      contentStyle={{
                         backgroundColor: "hsl(var(--card))",
                         border: "1px solid hsl(var(--border))",
                         borderRadius: "8px",
@@ -391,7 +390,7 @@ export default function Dashboard() {
                     <p className="text-xs text-muted-foreground">{payment.propertyName} - Due {payment.dueDate}</p>
                   </div>
                   <div className="flex items-center gap-2">
-                    <span className="text-sm font-medium">${payment.amount.toLocaleString()}</span>
+                    <span className="text-sm font-medium">KSH {payment.amount.toLocaleString()}</span>
                     <PaymentStatusBadge status={payment.status} />
                   </div>
                 </div>

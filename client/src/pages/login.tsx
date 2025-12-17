@@ -102,7 +102,7 @@ export default function Login() {
                             <span className="text-foreground">Demo123!</span>
                         </div>
                     </CardContent>
-                    <CardFooter>
+                    <CardFooter className="flex flex-col gap-2">
                         <Button
                             variant="outline"
                             className="w-full"
@@ -110,6 +110,14 @@ export default function Login() {
                             type="button"
                         >
                             Fill Demo Credentials
+                        </Button>
+                        <Button
+                            variant="default"
+                            className="w-full"
+                            onClick={() => onSubmit({ email: "demo@rentflow.app", password: "Demo123!", rememberMe: true })}
+                            type="button"
+                        >
+                            Launch Demo Now
                         </Button>
                     </CardFooter>
                 </Card>

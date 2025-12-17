@@ -87,8 +87,8 @@ const propertyTypeIcons: Record<string, React.ElementType> = {
 
 function PropertyCard({ property, onDelete }: { property: Property; onDelete: (id: string) => void }) {
   const Icon = propertyTypeIcons[property.type] || Building2;
-  const occupancyPercent = property.units > 0 
-    ? Math.round((property.occupiedUnits / property.units) * 100) 
+  const occupancyPercent = property.units > 0
+    ? Math.round((property.occupiedUnits / property.units) * 100)
     : 0;
 
   return (
@@ -122,7 +122,7 @@ function PropertyCard({ property, onDelete }: { property: Property; onDelete: (i
                   <Eye className="h-4 w-4 mr-2" />
                   View Details
                 </DropdownMenuItem>
-                <DropdownMenuItem 
+                <DropdownMenuItem
                   className="text-destructive"
                   onClick={() => onDelete(property.id)}
                 >
@@ -146,7 +146,7 @@ function PropertyCard({ property, onDelete }: { property: Property; onDelete: (i
           </div>
           <div className="flex items-center gap-2">
             <DollarSign className="h-4 w-4 text-muted-foreground" />
-            <span className="text-sm font-medium">${property.monthlyRent.toLocaleString()}/mo</span>
+            <span className="text-sm font-medium">KSH {property.monthlyRent.toLocaleString()}/mo</span>
           </div>
         </div>
       </CardContent>
@@ -392,7 +392,7 @@ export default function Properties() {
                     name="monthlyRent"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Monthly Rent ($)</FormLabel>
+                        <FormLabel>Monthly Rent (KSH)</FormLabel>
                         <FormControl>
                           <Input type="number" min="0" {...field} data-testid="input-property-rent" />
                         </FormControl>

@@ -102,6 +102,7 @@ export const payments = pgTable("payments", {
   tenantId: varchar("tenant_id").notNull(),
   propertyId: varchar("property_id").notNull(),
   amount: real("amount").notNull(),
+  paidAmount: real("paid_amount").notNull().default(0),
   dueDate: text("due_date").notNull(),
   paidDate: text("paid_date"),
   status: text("status").notNull().default("pending"), // paid, pending, overdue

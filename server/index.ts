@@ -119,10 +119,13 @@ async function seedDemoUser() {
         firstName: "Demo",
         lastName: "User",
         companyName: "Demo Properties Ltd",
+        currency: "KSH",
       });
       log("Demo user created successfully: demo@rentflow.app");
     } else {
-      log("Demo user already exists");
+      // Update currency just in case
+      await db.update(users).set({ currency: "KSH" }).where(eq(users.email, demoEmail));
+      log("Demo user already exists (KSH branding applied)");
     }
   } catch (error) {
     // If this fails (e.g. missing columns), we just log it and continue
