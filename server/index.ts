@@ -132,8 +132,12 @@ async function seedDemoUser() {
 }
 
 (async () => {
-  await seedDemoUser();
-  await registerRoutes(httpServer, app);
+  try {
+    await seedDemoUser();
+    await registerRoutes(httpServer, app);
+  } catch (err) {
+    log(`CRITICAL: Failed to start server components: ${err instanceof Error ? err.stack : err}`, "error");
+  }
 
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
     const status = err.status || err.statusCode || 500;
