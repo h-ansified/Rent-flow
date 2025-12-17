@@ -1,5 +1,5 @@
 import { Link, useLocation } from "wouter";
-import { useAuth, useLogout } from "@/hooks/use-auth";
+import { useAuth } from "@/hooks/use-auth";
 import {
   Sidebar,
   SidebarContent,
@@ -68,11 +68,10 @@ const secondaryNavItems = [
 
 export function AppSidebar() {
   const [location] = useLocation();
-  const { user } = useAuth();
-  const logoutMutation = useLogout();
+  const { user, logout } = useAuth();
 
   const handleLogout = () => {
-    logoutMutation.mutate();
+    logout();
   };
 
   const getInitials = (name: string) => {
