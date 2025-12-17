@@ -143,8 +143,8 @@ async function seedDemoUser() {
     const status = err.status || err.statusCode || 500;
     const message = err.message || "Internal Server Error";
 
-    res.status(status).json({ message });
-    throw err;
+    log(`ERROR: ${message} - ${err.stack}`, "error");
+    res.status(status).json({ message, details: process.env.NODE_ENV === "development" ? err.stack : undefined });
   });
 
   if (process.env.NODE_ENV === "production") {

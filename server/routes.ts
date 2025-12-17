@@ -19,6 +19,11 @@ export async function registerRoutes(
   app: Express
 ): Promise<Server> {
 
+  // Health check route
+  app.get("/api/health", (_req, res) => {
+    res.json({ status: "ok", timestamp: new Date().toISOString() });
+  });
+
   // Authentication routes (public, with rate limiting)
   app.use("/api/auth", authLimiter, authRouter);
 
