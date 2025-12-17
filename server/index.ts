@@ -2,16 +2,16 @@ import express, { type Request, Response, NextFunction } from "express";
 import session from "express-session";
 import pgSimple from "connect-pg-simple";
 import helmet from "helmet";
-import { Pool } from "pg";
 import { registerRoutes } from "./routes";
 import { serveStatic } from "./static";
 import { createServer } from "http";
+import { pool, db } from "./db";
+import { users } from "@shared/schema";
+import { hashPassword } from "./auth";
+import { eq } from "drizzle-orm";
 
 const app = express();
 const httpServer = createServer(app);
-
-// Import pool from db.ts for session store
-import { pool } from "./db";
 
 // PostgreSQL session store
 const PgSession = pgSimple(session);
@@ -22,7 +22,7 @@ declare module "http" {
   }
 }
 
-// Security headers with helmet
+// ... helmet and other middleware ...
 app.use(helmet({
   contentSecurityPolicy: process.env.NODE_ENV === "production" ? undefined : false,
 }));
@@ -56,9 +56,9 @@ app.use(
     saveUninitialized: false,
     cookie: {
       maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days
-      httpOnly: true, // Prevent client-side JS access (XSS protection)
-      secure: process.env.NODE_ENV === "production", // HTTPS only in production
-      sameSite: "lax", // Better for redirect flows
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "lax",
     },
   })
 );
@@ -100,14 +100,10 @@ app.use((req, res, next) => {
   next();
 });
 
-import { db } from "./db";
-import { users } from "@shared/schema";
-import { hashPassword } from "./auth";
-import { eq } from "drizzle-orm";
-
 async function seedDemoUser() {
   try {
     const demoEmail = "demo@rentflow.app";
+    // Check if user exists (this will fail if DB columns are missing, but it's caught)
     const [existing] = await db
       .select()
       .from(users)
@@ -129,7 +125,9 @@ async function seedDemoUser() {
       log("Demo user already exists");
     }
   } catch (error) {
-    console.error("Failed to seed demo user:", error);
+    // If this fails (e.g. missing columns), we just log it and continue
+    // It's vital that this doesn't crash the server startup
+    console.warn("Demo seeding skipped/failed (possibly missing DB columns):", error instanceof Error ? error.message : error);
   }
 }
 
@@ -145,9 +143,6 @@ async function seedDemoUser() {
     throw err;
   });
 
-  // importantly only setup vite in development and after
-  // setting up all the other routes so the catch-all route
-  // doesn't interfere with the other routes
   if (process.env.NODE_ENV === "production") {
     serveStatic(app);
   } else {
@@ -155,10 +150,6 @@ async function seedDemoUser() {
     await setupVite(httpServer, app);
   }
 
-  // ALWAYS serve the app on the port specified in the environment variable PORT
-  // Other ports are firewalled. Default to 5000 if not specified.
-  // this serves both the API and the client.
-  // It is the only port that is not firewalled.
   const port = parseInt(process.env.PORT || "5000", 10);
   httpServer.listen(
     {

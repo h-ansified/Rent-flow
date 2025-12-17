@@ -48,6 +48,8 @@ import {
   ArrowRight,
   CheckCircle2,
   Trash2,
+  CreditCard,
+  DollarSign,
 } from "lucide-react";
 import {
   DropdownMenu,
