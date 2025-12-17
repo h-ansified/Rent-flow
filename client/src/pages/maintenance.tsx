@@ -192,10 +192,10 @@ function RequestCard({
               Assigned to: {request.assignedTo}
             </div>
           )}
-          {request.cost && (
+          {typeof request.cost === 'number' && (
             <div className="flex items-center gap-1.5 text-green-600 font-medium">
               <CreditCard className="h-3 w-3" />
-              Cost: ${request.cost.toFixed(2)}
+              Cost: ${Number(request.cost).toFixed(2)}
             </div>
           )}
         </div>
