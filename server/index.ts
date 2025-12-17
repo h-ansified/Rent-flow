@@ -1,4 +1,8 @@
 import express, { type Request, Response, NextFunction } from "express";
+import session from "express-session";
+import pgSimple from "connect-pg-simple";
+import helmet from "helmet";
+import { Pool } from "pg";
 import { registerRoutes } from "./routes";
 import { serveStatic } from "./static";
 import { createServer } from "http";
@@ -6,11 +10,22 @@ import { createServer } from "http";
 const app = express();
 const httpServer = createServer(app);
 
+// Import pool from db.ts for session store
+import { pool } from "./db";
+
+// PostgreSQL session store
+const PgSession = pgSimple(session);
+
 declare module "http" {
   interface IncomingMessage {
     rawBody: unknown;
   }
 }
+
+// Security headers with helmet
+app.use(helmet({
+  contentSecurityPolicy: process.env.NODE_ENV === "production" ? undefined : false,
+}));
 
 app.use(
   express.json({
@@ -21,6 +36,30 @@ app.use(
 );
 
 app.use(express.urlencoded({ extended: false }));
+
+// Session configuration
+if (!process.env.SESSION_SECRET) {
+  console.warn("WARNING: SESSION_SECRET not set! Using insecure default for development only.");
+}
+
+app.use(
+  session({
+    store: new PgSession({
+      pool,
+      tableName: "session",
+      createTableIfMissing: true,
+    }),
+    secret: process.env.SESSION_SECRET || "dev-secret-change-in-production",
+    resave: false,
+    saveUninitialized: false,
+    cookie: {
+      maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days
+      httpOnly: true, // Prevent client-side JS access (XSS protection)
+      secure: process.env.NODE_ENV === "production", // HTTPS only in production
+      sameSite: "strict", // CSRF protection
+    },
+  })
+);
 
 export function log(message: string, source = "express") {
   const formattedTime = new Date().toLocaleTimeString("en-US", {
