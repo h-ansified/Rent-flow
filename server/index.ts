@@ -42,6 +42,8 @@ if (!process.env.SESSION_SECRET) {
   console.warn("WARNING: SESSION_SECRET not set! Using insecure default for development only.");
 }
 
+app.set("trust proxy", 1);
+
 app.use(
   session({
     store: new PgSession({
@@ -56,7 +58,7 @@ app.use(
       maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days
       httpOnly: true, // Prevent client-side JS access (XSS protection)
       secure: process.env.NODE_ENV === "production", // HTTPS only in production
-      sameSite: "strict", // CSRF protection
+      sameSite: "lax", // Better for redirect flows
     },
   })
 );
