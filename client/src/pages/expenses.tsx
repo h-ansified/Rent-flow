@@ -40,12 +40,13 @@ import {
     Repeat,
     FileText,
     Loader2,
-    ZapIcon,
     Droplets,
     Wrench,
     Shield,
     Receipt,
     LayoutGrid,
+    Calendar,
+    ArrowUpRight,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
@@ -65,7 +66,7 @@ interface CategoryStats {
 }
 
 const categoryIcons: Record<string, any> = {
-    electricity: ZapIcon,
+    electricity: Zap,
     water: Droplets,
     maintenance: Wrench,
     insurance: Shield,
@@ -121,53 +122,163 @@ function CategoryCard({
 }) {
     const { user } = useAuth();
     const Icon = categoryIcons[category] || LayoutGrid;
-    const balance = stats.totalAmount - stats.paidAmount;
+
+    const categoryColors: Record<string, string> = {
+        electricity: "from-yellow-500/20 to-yellow-600/10 text-yellow-500 border-yellow-500/20 shadow-yellow-500/5",
+        water: "from-blue-500/20 to-blue-600/10 text-blue-500 border-blue-500/20 shadow-blue-500/5",
+        maintenance: "from-orange-500/20 to-orange-600/10 text-orange-500 border-orange-500/20 shadow-orange-500/5",
+        insurance: "from-purple-500/20 to-purple-600/10 text-purple-500 border-purple-500/20 shadow-purple-500/5",
+        tax: "from-red-500/20 to-red-600/10 text-red-500 border-red-500/20 shadow-red-500/5",
+        other: "from-emerald-500/20 to-emerald-600/10 text-emerald-500 border-emerald-500/20 shadow-emerald-500/5",
+    };
+
+    const colorClass = categoryColors[category] || categoryColors.other;
 
     return (
-        <Card
-            className={`cursor-pointer transition-all hover:shadow-lg ${isSelected ? 'ring-2 ring-primary' : ''}`}
+        <div
             onClick={onClick}
+            className={`liquid-glass rounded-[2rem] p-6 cursor-pointer transition-all duration-300 group ${isSelected ? 'ring-2 ring-primary border-primary/50 translate-y-[-4px] shadow-2xl' : 'hover:translate-y-[-2px] hover:shadow-xl'
+                }`}
         >
-            <CardHeader className="pb-3">
-                <div className="flex items-center justify-between">
+            <div className="flex items-start justify-between mb-6">
+                <div className={`h-12 w-12 rounded-2xl bg-gradient-to-br ${colorClass} border flex items-center justify-center shadow-lg`}>
+                    <Icon className="h-6 w-6" />
+                </div>
+                <div className="flex flex-col items-end gap-1">
+                    <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground opacity-60">Total Spent</p>
+                    <p className="text-xl font-black tracking-tight">
+                        {formatCurrency(stats.paidAmount, user?.currency ?? undefined)}
+                    </p>
+                </div>
+            </div>
+
+            <div className="space-y-4">
+                <div>
+                    <h3 className="text-lg font-bold capitalize mb-1">{category}</h3>
                     <div className="flex items-center gap-2">
-                        <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center">
-                            <Icon className="h-5 w-5 text-primary" />
-                        </div>
-                        <div>
-                            <CardTitle className="text-sm font-medium capitalize">{category}</CardTitle>
-                            <p className="text-xs text-muted-foreground">{stats.count} expenses</p>
-                        </div>
+                        <Badge variant="outline" className="text-[10px] font-bold bg-white/5 border-white/10">
+                            {stats.count} {stats.count === 1 ? 'Entry' : 'Entries'}
+                        </Badge>
+                        {stats.overdueCount > 0 && (
+                            <Badge variant="destructive" className="text-[10px] h-5 px-2 font-bold animate-pulse">
+                                {stats.overdueCount} Overdue
+                            </Badge>
+                        )}
                     </div>
                 </div>
-            </CardHeader>
-            <CardContent className="space-y-2">
-                <div className="flex justify-between items-baseline">
-                    <span className="text-xs text-muted-foreground">Total</span>
-                    <span className="text-lg font-bold">{formatCurrency(stats.totalAmount, user?.currency ?? undefined)}</span>
+
+                <div className="space-y-2">
+                    <div className="flex justify-between text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                        <span>Payment Progress</span>
+                        <span>{Math.round((stats.paidAmount / (stats.totalAmount || 1)) * 100)}%</span>
+                    </div>
+                    <div className="h-2 w-full bg-white/5 rounded-full overflow-hidden border border-white/5">
+                        <div
+                            className="h-full bg-primary transition-all duration-1000 ease-out shadow-[0_0_10px_rgba(var(--primary),0.5)]"
+                            style={{ width: `${(stats.paidAmount / (stats.totalAmount || 1)) * 100}%` }}
+                        />
+                    </div>
                 </div>
-                <div className="flex justify-between items-baseline">
-                    <span className="text-xs text-muted-foreground">Paid</span>
-                    <span className="text-sm font-medium text-green-600">{formatCurrency(stats.paidAmount, user?.currency ?? undefined)}</span>
+            </div>
+        </div>
+    );
+}
+
+function ExpenseTile({
+    expense,
+    onView,
+    onRecord
+}: {
+    expense: ExpenseWithProperty;
+    onView: () => void;
+    onRecord: () => void;
+}) {
+    const { user } = useAuth();
+    const Icon = categoryIcons[expense.category] || LayoutGrid;
+    const balance = expense.amount - expense.paidAmount;
+    const isPaid = expense.status === 'paid';
+
+    const categoryColors: Record<string, string> = {
+        electricity: "bg-yellow-500/20 text-yellow-500 border-yellow-500/30",
+        water: "bg-blue-500/20 text-blue-500 border-blue-500/30",
+        maintenance: "bg-orange-500/20 text-orange-500 border-orange-500/30",
+        insurance: "bg-purple-500/20 text-purple-500 border-purple-500/30",
+        tax: "bg-red-500/20 text-red-500 border-red-500/30",
+        other: "bg-emerald-500/20 text-emerald-500 border-emerald-500/30",
+    };
+
+    const colorClass = categoryColors[expense.category] || categoryColors.other;
+
+    return (
+        <div
+            className="glass-card rounded-[2rem] p-6 flex flex-col gap-4 cursor-pointer group"
+            onClick={onView}
+        >
+            <div className="flex items-start justify-between">
+                <div className={`glass-icon-container ${colorClass} border`}>
+                    <Icon className="h-6 w-6" />
                 </div>
-                <div className="flex justify-between items-baseline border-t pt-2">
-                    <span className="text-xs font-medium">Balance</span>
-                    <span className="text-base font-bold text-red-600">{formatCurrency(balance, user?.currency ?? undefined)}</span>
-                </div>
-                <div className="flex gap-2 pt-1">
-                    {stats.pendingCount > 0 && (
-                        <Badge variant="secondary" className="text-xs">
-                            {stats.pendingCount} pending
+                <div className="flex flex-col items-end gap-2">
+                    <ExpenseStatusBadge status={expense.status} />
+                    {expense.isRecurring && (
+                        <Badge variant="outline" className="text-[10px] py-0 h-5 border-primary/30 text-primary">
+                            <Repeat className="h-2.5 w-2.5 mr-1" />
+                            {expense.frequency}
                         </Badge>
                     )}
-                    {stats.overdueCount > 0 && (
-                        <Badge variant="destructive" className="text-xs">
-                            {stats.overdueCount} overdue
-                        </Badge>
-                    )}
                 </div>
-            </CardContent>
-        </Card>
+            </div>
+
+            <div className="space-y-1">
+                <h3 className="text-lg font-bold truncate group-hover:text-primary transition-colors">
+                    {expense.title}
+                </h3>
+                <p className="text-xs text-muted-foreground line-clamp-1">
+                    {expense.propertyName || "General Expense"}
+                </p>
+            </div>
+
+            <div className="mt-auto space-y-3">
+                <div className="flex justify-between items-end">
+                    <div>
+                        <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Remaining</p>
+                        <p className={`text-xl font-black ${balance > 0 ? 'text-red-500' : 'text-green-500'}`}>
+                            {formatCurrency(balance, user?.currency ?? undefined)}
+                        </p>
+                    </div>
+                    <div className="text-right">
+                        <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Total</p>
+                        <p className="text-sm font-bold opacity-80">
+                            {formatCurrency(expense.amount, user?.currency ?? undefined)}
+                        </p>
+                    </div>
+                </div>
+
+                <div className="flex items-center gap-2 pt-2">
+                    {!isPaid && (
+                        <Button
+                            className="flex-1 rounded-2xl h-10 font-bold bg-primary hover:bg-primary/90 shadow-lg shadow-primary/20"
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                onRecord();
+                            }}
+                        >
+                            Pay
+                        </Button>
+                    )}
+                    <Button
+                        variant="secondary"
+                        className="rounded-2xl h-10 w-10 p-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            onView();
+                        }}
+                    >
+                        <ArrowUpRight className="h-5 w-5" />
+                    </Button>
+                </div>
+            </div>
+        </div>
     );
 }
 
@@ -410,58 +521,31 @@ export default function Expenses() {
             </div>
 
             {/* Metrics */}
-            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-                <Card>
-                    <CardHeader className="flex flex-row items-center justify-between gap-4 space-y-0 pb-2">
-                        <CardTitle className="text-sm font-medium text-muted-foreground">Total Paid</CardTitle>
-                        <div className="h-9 w-9 rounded-md flex items-center justify-center bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400">
-                            <TrendingUp className="h-4 w-4" />
+            <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
+                {[
+                    { title: "Total Paid", value: totalExpenses, sub: "All time", icon: TrendingUp, color: "from-red-500 to-rose-600" },
+                    { title: "Pending", value: pendingExpenses, sub: "Awaiting payment", icon: Clock, color: "from-yellow-400 to-orange-500" },
+                    { title: "Overdue", value: overdueExpenses, sub: "Past due date", icon: AlertCircle, color: "from-red-600 to-red-800" },
+                    { title: "Recurring", value: recurringCount, sub: "Auto-tracked", icon: Repeat, color: "from-blue-500 to-indigo-600" },
+                ].map((metric, i) => (
+                    <div key={i} className="liquid-glass rounded-[2rem] p-6 relative overflow-hidden group">
+                        <div className={`absolute top-0 right-0 w-32 h-32 bg-gradient-to-br ${metric.color} opacity-10 blur-3xl -mr-16 -mt-16 group-hover:opacity-20 transition-opacity`} />
+                        <div className="flex flex-col gap-4">
+                            <div className="flex items-center justify-between">
+                                <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">{metric.title}</p>
+                                <metric.icon className="h-4 w-4 text-muted-foreground opacity-50" />
+                            </div>
+                            <div className="space-y-1">
+                                <h3 className="text-3xl font-black tracking-tight">
+                                    {typeof metric.value === 'number' ?
+                                        (metric.title === 'Total Paid' ? formatCurrency(metric.value, user?.currency ?? undefined) : metric.value)
+                                        : metric.value}
+                                </h3>
+                                <p className="text-[10px] font-medium text-muted-foreground opacity-70">{metric.sub}</p>
+                            </div>
                         </div>
-                    </CardHeader>
-                    <CardContent>
-                        <div className="text-3xl font-semibold">{formatCurrency(totalExpenses, user?.currency ?? undefined)}</div>
-                        <p className="text-xs text-muted-foreground mt-1">All time</p>
-                    </CardContent>
-                </Card>
-
-                <Card>
-                    <CardHeader className="flex flex-row items-center justify-between gap-4 space-y-0 pb-2">
-                        <CardTitle className="text-sm font-medium text-muted-foreground">Pending</CardTitle>
-                        <div className="h-9 w-9 rounded-md flex items-center justify-center bg-yellow-100 dark:bg-yellow-900/30 text-yellow-600 dark:text-yellow-400">
-                            <Clock className="h-4 w-4" />
-                        </div>
-                    </CardHeader>
-                    <CardContent>
-                        <div className="text-3xl font-semibold">{pendingExpenses}</div>
-                        <p className="text-xs text-muted-foreground mt-1">Awaiting payment</p>
-                    </CardContent>
-                </Card>
-
-                <Card>
-                    <CardHeader className="flex flex-row items-center justify-between gap-4 space-y-0 pb-2">
-                        <CardTitle className="text-sm font-medium text-muted-foreground">Overdue</CardTitle>
-                        <div className="h-9 w-9 rounded-md flex items-center justify-center bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400">
-                            <AlertCircle className="h-4 w-4" />
-                        </div>
-                    </CardHeader>
-                    <CardContent>
-                        <div className="text-3xl font-semibold">{overdueExpenses}</div>
-                        <p className="text-xs text-muted-foreground mt-1">Past due date</p>
-                    </CardContent>
-                </Card>
-
-                <Card>
-                    <CardHeader className="flex flex-row items-center justify-between gap-4 space-y-0 pb-2">
-                        <CardTitle className="text-sm font-medium text-muted-foreground">Recurring</CardTitle>
-                        <div className="h-9 w-9 rounded-md flex items-center justify-center bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400">
-                            <Repeat className="h-4 w-4" />
-                        </div>
-                    </CardHeader>
-                    <CardContent>
-                        <div className="text-3xl font-semibold">{recurringCount}</div>
-                        <p className="text-xs text-muted-foreground mt-1">Auto-tracked</p>
-                    </CardContent>
-                </Card>
+                    </div>
+                ))}
             </div>
 
             {/* Category Tiles */}
@@ -528,213 +612,202 @@ export default function Expenses() {
                 </Alert>
             )}
 
-            <Card>
-                <CardContent className="p-0">
-                    <Table>
-                        <TableHeader>
-                            <TableRow>
-                                <TableHead>Title</TableHead>
-                                <TableHead>Category</TableHead>
-                                <TableHead>Property</TableHead>
-                                <TableHead>Amount</TableHead>
-                                <TableHead>Paid</TableHead>
-                                <TableHead>Balance</TableHead>
-                                <TableHead>Due Date</TableHead>
-                                <TableHead>Status</TableHead>
-                                <TableHead className="w-[120px]">Actions</TableHead>
-                            </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                            {isLoading ? (
-                                <>
-                                    {[1, 2, 3].map((i) => (
-                                        <TableRow key={i}>
-                                            <TableCell><Skeleton className="h-4 w-32" /></TableCell>
-                                            <TableCell><Skeleton className="h-4 w-20" /></TableCell>
-                                            <TableCell><Skeleton className="h-4 w-24" /></TableCell>
-                                            <TableCell><Skeleton className="h-4 w-20" /></TableCell>
-                                            <TableCell><Skeleton className="h-4 w-20" /></TableCell>
-                                            <TableCell><Skeleton className="h-4 w-20" /></TableCell>
-                                            <TableCell><Skeleton className="h-4 w-24" /></TableCell>
-                                            <TableCell><Skeleton className="h-6 w-16" /></TableCell>
-                                            <TableCell><Skeleton className="h-8 w-24" /></TableCell>
-                                        </TableRow>
-                                    ))}
-                                </>
-                            ) : filteredExpenses && filteredExpenses.length > 0 ? (
-                                filteredExpenses.map((expense) => (
-                                    <TableRow key={expense.id}>
-                                        <TableCell className="font-medium">
-                                            <div className="flex items-center gap-2">
-                                                {expense.isRecurring && <Repeat className="h-3 w-3 text-muted-foreground" />}
-                                                {expense.title}
-                                            </div>
-                                        </TableCell>
-                                        <TableCell><CategoryBadge category={expense.category} /></TableCell>
-                                        <TableCell className="text-sm text-muted-foreground">{expense.propertyName || "General"}</TableCell>
-                                        <TableCell className="font-medium">{formatCurrency(expense.amount, user?.currency ?? undefined)}</TableCell>
-                                        <TableCell className="text-green-600">{formatCurrency(expense.paidAmount, user?.currency ?? undefined)}</TableCell>
-                                        <TableCell className="font-bold text-red-600">{formatCurrency(expense.amount - expense.paidAmount, user?.currency ?? undefined)}</TableCell>
-                                        <TableCell>{expense.dueDate}</TableCell>
-                                        <TableCell><ExpenseStatusBadge status={expense.status} /></TableCell>
-                                        <TableCell>
-                                            <div className="flex flex-col gap-1">
-                                                {expense.status !== "paid" && (
-                                                    <Button
-                                                        size="sm"
-                                                        onClick={() => setSelectedExpense(expense)}
-                                                    >
-                                                        Record Payment
-                                                    </Button>
-                                                )}
-                                                <Button
-                                                    size="sm"
-                                                    variant="outline"
-                                                    onClick={() => setViewingExpense(expense)}
-                                                >
-                                                    View Details
-                                                </Button>
-                                            </div>
-                                        </TableCell>
-                                    </TableRow>
-                                ))
-                            ) : (
-                                <TableRow>
-                                    <TableCell colSpan={9} className="h-32 text-center">
-                                        <Zap className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-                                        <h3 className="text-lg font-medium mb-2">No expenses found</h3>
-                                        <p className="text-muted-foreground">
-                                            {searchQuery || statusFilter !== "all" || categoryFilter !== "all"
-                                                ? "Try adjusting your search or filters"
-                                                : "Add your first expense to start tracking"}
-                                        </p>
-                                    </TableCell>
-                                </TableRow>
-                            )}
-                        </TableBody>
-                    </Table>
-                </CardContent>
-            </Card>
+            {/* Expenses Grid */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                {isLoading ? (
+                    Array.from({ length: 8 }).map((_, i) => (
+                        <div key={i} className="glass-card rounded-[2rem] p-6 space-y-4 h-[280px]">
+                            <Skeleton className="h-12 w-12 rounded-2xl" />
+                            <div className="space-y-2">
+                                <Skeleton className="h-6 w-3/4" />
+                                <Skeleton className="h-4 w-1/2" />
+                            </div>
+                            <div className="mt-auto pt-8 flex justify-between items-end">
+                                <div className="space-y-2">
+                                    <Skeleton className="h-3 w-16" />
+                                    <Skeleton className="h-6 w-24" />
+                                </div>
+                                <Skeleton className="h-10 w-20 rounded-2xl" />
+                            </div>
+                        </div>
+                    ))
+                ) : filteredExpenses && filteredExpenses.length > 0 ? (
+                    filteredExpenses.map((expense) => (
+                        <ExpenseTile
+                            key={expense.id}
+                            expense={expense}
+                            onView={() => setViewingExpense(expense)}
+                            onRecord={() => setSelectedExpense(expense)}
+                        />
+                    ))
+                ) : (
+                    <div className="col-span-full py-20 flex flex-col items-center justify-center glass-card rounded-[3rem]">
+                        <div className="h-20 w-20 rounded-full bg-muted flex items-center justify-center mb-6">
+                            <Zap className="h-10 w-10 text-muted-foreground/50" />
+                        </div>
+                        <h3 className="text-2xl font-bold mb-2">No expenses found</h3>
+                        <p className="text-muted-foreground text-center max-w-sm">
+                            {searchQuery || statusFilter !== "all" || categoryFilter !== "all"
+                                ? "Try adjusting your search or filters to find what you're looking for."
+                                : "Start tracking your business spend by adding your first expense today."}
+                        </p>
+                        <Button
+                            variant="link"
+                            className="mt-4 font-bold text-primary"
+                            onClick={() => setIsNewDialogOpen(true)}
+                        >
+                            Add your first expense
+                        </Button>
+                    </div>
+                )}
+            </div>
 
             {/* Create Expense Dialog */}
             <Dialog open={isNewDialogOpen} onOpenChange={setIsNewDialogOpen}>
-                <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-                    <DialogHeader>
-                        <DialogTitle>Add New Expense</DialogTitle>
-                    </DialogHeader>
-                    <div className="grid gap-4">
-                        <div className="grid grid-cols-2 gap-4">
-                            <div className="space-y-2 col-span-2">
-                                <Label htmlFor="title">Title *</Label>
-                                <Input
-                                    id="title"
-                                    placeholder="e.g., KPLC - Main Building"
-                                    value={title}
-                                    onChange={(e) => setTitle(e.target.value)}
-                                />
+                <DialogContent className="max-w-2xl p-0 overflow-hidden border-none bg-transparent shadow-none">
+                    <div className="liquid-glass rounded-[2.5rem] overflow-hidden flex flex-col h-full max-h-[90vh]">
+                        <div className="p-8 space-y-8 overflow-y-auto">
+                            <div className="flex justify-between items-center">
+                                <h2 className="text-3xl font-black tracking-tight">Add Expense</h2>
+                                <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="rounded-full hover:bg-white/10"
+                                    onClick={() => { setIsNewDialogOpen(false); resetForm(); }}
+                                >
+                                    <Plus className="h-6 w-6 rotate-45" />
+                                </Button>
                             </div>
-                            <div className="space-y-2">
-                                <Label htmlFor="category">Category *</Label>
-                                <Select value={category} onValueChange={setCategory}>
-                                    <SelectTrigger id="category">
-                                        <SelectValue />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        <SelectItem value="electricity">Electricity</SelectItem>
-                                        <SelectItem value="water">Water</SelectItem>
-                                        <SelectItem value="maintenance">Maintenance</SelectItem>
-                                        <SelectItem value="insurance">Insurance</SelectItem>
-                                        <SelectItem value="tax">Tax</SelectItem>
-                                        <SelectItem value="other">Other</SelectItem>
-                                    </SelectContent>
-                                </Select>
-                            </div>
-                            <div className="space-y-2">
-                                <Label htmlFor="property">Property (Optional)</Label>
-                                <Select value={propertyId} onValueChange={setPropertyId}>
-                                    <SelectTrigger id="property">
-                                        <SelectValue placeholder="General expense" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        <SelectItem value="">General</SelectItem>
-                                        {properties?.map(prop => (
-                                            <SelectItem key={prop.id} value={prop.id}>{prop.name}</SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                </Select>
-                            </div>
-                            <div className="space-y-2">
-                                <Label htmlFor="amount">Amount ({user?.currency || "KES"}) *</Label>
-                                <Input
-                                    id="amount"
-                                    type="number"
-                                    placeholder="0.00"
-                                    value={amount}
-                                    onChange={(e) => setAmount(e.target.value)}
-                                />
-                            </div>
-                            <div className="space-y-2">
-                                <Label htmlFor="dueDate">Due Date *</Label>
-                                <Input
-                                    id="dueDate"
-                                    type="date"
-                                    value={dueDate}
-                                    onChange={(e) => setDueDate(e.target.value)}
-                                />
-                            </div>
-                            <div className="space-y-2 col-span-2">
-                                <Label htmlFor="expiryDate">Expiry/Cutoff Date (Optional)</Label>
-                                <Input
-                                    id="expiryDate"
-                                    type="date"
-                                    value={expiryDate}
-                                    onChange={(e) => setExpiryDate(e.target.value)}
-                                />
-                            </div>
-                            <div className="space-y-2 col-span-2">
-                                <div className="flex items-center gap-2">
-                                    <input
-                                        type="checkbox"
-                                        id="isRecurring"
-                                        checked={isRecurring}
-                                        onChange={(e) => setIsRecurring(e.target.checked)}
-                                        className="h-4 w-4 rounded border-gray-300"
-                                    />
-                                    <Label htmlFor="isRecurring" className="cursor-pointer">Recurring Expense</Label>
-                                </div>
-                            </div>
-                            {isRecurring && (
+
+                            <div className="grid grid-cols-2 gap-6">
                                 <div className="space-y-2 col-span-2">
-                                    <Label htmlFor="frequency">Frequency</Label>
-                                    <Select value={frequency} onValueChange={setFrequency}>
-                                        <SelectTrigger id="frequency">
+                                    <Label className="text-[10px] font-bold uppercase tracking-widest px-1">Title *</Label>
+                                    <Input
+                                        className="rounded-2xl bg-white/5 border-white/10 h-12"
+                                        placeholder="e.g., KPLC - Main Building"
+                                        value={title}
+                                        onChange={(e) => setTitle(e.target.value)}
+                                    />
+                                </div>
+                                <div className="space-y-2">
+                                    <Label className="text-[10px] font-bold uppercase tracking-widest px-1">Category *</Label>
+                                    <Select value={category} onValueChange={setCategory}>
+                                        <SelectTrigger className="rounded-2xl bg-white/5 border-white/10 h-12">
                                             <SelectValue />
                                         </SelectTrigger>
-                                        <SelectContent>
-                                            <SelectItem value="monthly">Monthly</SelectItem>
-                                            <SelectItem value="quarterly">Quarterly</SelectItem>
-                                            <SelectItem value="annually">Annually</SelectItem>
+                                        <SelectContent className="rounded-2xl border-white/10 liquid-glass">
+                                            <SelectItem value="electricity">Electricity</SelectItem>
+                                            <SelectItem value="water">Water</SelectItem>
+                                            <SelectItem value="maintenance">Maintenance</SelectItem>
+                                            <SelectItem value="insurance">Insurance</SelectItem>
+                                            <SelectItem value="tax">Tax</SelectItem>
+                                            <SelectItem value="other">Other</SelectItem>
                                         </SelectContent>
                                     </Select>
                                 </div>
-                            )}
-                            <div className="space-y-2 col-span-2">
-                                <Label htmlFor="notes">Notes</Label>
-                                <Textarea
-                                    id="notes"
-                                    placeholder="Add any additional notes..."
-                                    value={notes}
-                                    onChange={(e) => setNotes(e.target.value)}
-                                    rows={3}
-                                />
+                                <div className="space-y-2">
+                                    <Label className="text-[10px] font-bold uppercase tracking-widest px-1">Property</Label>
+                                    <Select value={propertyId} onValueChange={setPropertyId}>
+                                        <SelectTrigger className="rounded-2xl bg-white/5 border-white/10 h-12">
+                                            <SelectValue placeholder="General expense" />
+                                        </SelectTrigger>
+                                        <SelectContent className="rounded-2xl border-white/10 liquid-glass text-foreground">
+                                            <SelectItem value="">General</SelectItem>
+                                            {properties?.map(prop => (
+                                                <SelectItem key={prop.id} value={prop.id}>{prop.name}</SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+                                <div className="space-y-2">
+                                    <Label className="text-[10px] font-bold uppercase tracking-widest px-1">Amount ({user?.currency || "KES"}) *</Label>
+                                    <Input
+                                        className="rounded-2xl bg-white/5 border-white/10 h-12"
+                                        type="number"
+                                        placeholder="0.00"
+                                        value={amount}
+                                        onChange={(e) => setAmount(e.target.value)}
+                                    />
+                                </div>
+                                <div className="space-y-2">
+                                    <Label className="text-[10px] font-bold uppercase tracking-widest px-1">Due Date *</Label>
+                                    <Input
+                                        className="rounded-2xl bg-white/5 border-white/10 h-12"
+                                        type="date"
+                                        value={dueDate}
+                                        onChange={(e) => setDueDate(e.target.value)}
+                                    />
+                                </div>
+
+                                <div className="col-span-2 p-4 bg-white/5 rounded-[2rem] border border-white/10 space-y-4">
+                                    <div className="flex items-center justify-between px-2">
+                                        <div className="flex items-center gap-3">
+                                            <div className="h-10 w-10 rounded-xl bg-blue-500/20 flex items-center justify-center">
+                                                <Repeat className={`h-5 w-5 ${isRecurring ? 'text-blue-500' : 'text-blue-500/50'}`} />
+                                            </div>
+                                            <div>
+                                                <p className="text-sm font-bold">Recurring Expense</p>
+                                                <p className="text-[10px] text-muted-foreground tracking-tight">Toggle for monthly/annual payments</p>
+                                            </div>
+                                        </div>
+                                        <button
+                                            role="switch"
+                                            aria-checked={isRecurring}
+                                            onClick={() => setIsRecurring(!isRecurring)}
+                                            className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${isRecurring ? 'bg-primary' : 'bg-white/10'}`}
+                                        >
+                                            <span className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${isRecurring ? 'translate-x-5' : 'translate-x-0'}`} />
+                                        </button>
+                                    </div>
+
+                                    {isRecurring && (
+                                        <div className="pt-2 animate-in fade-in slide-in-from-top-2 duration-300">
+                                            <Label className="text-[10px] font-bold uppercase tracking-widest px-3 mb-2 block">Frequency</Label>
+                                            <div className="flex gap-2">
+                                                {['monthly', 'quarterly', 'annually'].map((freq) => (
+                                                    <Button
+                                                        key={freq}
+                                                        variant="ghost"
+                                                        size="sm"
+                                                        className={`flex-1 rounded-xl h-9 capitalize text-xs font-bold ${frequency === freq ? 'bg-primary text-white hover:bg-primary' : 'bg-white/5 hover:bg-white/10'}`}
+                                                        onClick={() => setFrequency(freq)}
+                                                    >
+                                                        {freq}
+                                                    </Button>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+
+                                <div className="space-y-2 col-span-2">
+                                    <Label className="text-[10px] font-bold uppercase tracking-widest px-1">Notes</Label>
+                                    <Textarea
+                                        className="rounded-2xl bg-white/5 border-white/10 min-h-[100px] resize-none"
+                                        placeholder="Add any additional details..."
+                                        value={notes}
+                                        onChange={(e) => setNotes(e.target.value)}
+                                    />
+                                </div>
                             </div>
-                        </div>
-                        <div className="flex justify-end gap-3">
-                            <Button variant="outline" onClick={() => { setIsNewDialogOpen(false); resetForm(); }}>Cancel</Button>
-                            <Button onClick={handleCreateExpense} disabled={createExpenseMutation.isPending}>
-                                {createExpenseMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                                {createExpenseMutation.isPending ? "Creating..." : "Create Expense"}
-                            </Button>
+
+                            <div className="flex gap-4">
+                                <Button
+                                    variant="outline"
+                                    className="flex-1 rounded-[1.5rem] h-14 font-bold border-white/10 hover:bg-white/5"
+                                    onClick={() => { setIsNewDialogOpen(false); resetForm(); }}
+                                >
+                                    Cancel
+                                </Button>
+                                <Button
+                                    className="flex-[2] rounded-[1.5rem] h-14 font-black text-lg shadow-xl shadow-primary/20"
+                                    onClick={handleCreateExpense}
+                                    disabled={createExpenseMutation.isPending}
+                                >
+                                    {createExpenseMutation.isPending && <Loader2 className="mr-2 h-5 w-5 animate-spin" />}
+                                    {createExpenseMutation.isPending ? "Creating..." : "Save Expense"}
+                                </Button>
+                            </div>
                         </div>
                     </div>
                 </DialogContent>
@@ -742,83 +815,107 @@ export default function Expenses() {
 
             {/* Record Payment Dialog */}
             <Dialog open={!!selectedExpense} onOpenChange={() => setSelectedExpense(null)}>
-                <DialogContent className="max-h-[90vh] overflow-y-auto">
-                    <DialogHeader>
-                        <DialogTitle>Record Payment</DialogTitle>
-                    </DialogHeader>
-                    {selectedExpense && (
-                        <div className="space-y-4">
-                            <div className="p-4 bg-muted rounded-md space-y-2">
-                                <div className="flex justify-between">
-                                    <span className="text-muted-foreground">Total Amount</span>
-                                    <span className="font-medium text-lg">{formatCurrency(selectedExpense.amount, user?.currency ?? undefined)}</span>
+                <DialogContent className="max-w-md p-0 overflow-hidden border-none bg-transparent shadow-none">
+                    <div className="liquid-glass rounded-[2.5rem] overflow-hidden flex flex-col h-full max-h-[90vh]">
+                        {selectedExpense && (
+                            <div className="p-8 space-y-8">
+                                <div className="flex justify-between items-center">
+                                    <div className="space-y-1">
+                                        <h2 className="text-3xl font-black tracking-tight">Pay Expense</h2>
+                                        <p className="text-xs text-muted-foreground opacity-70">{selectedExpense.title}</p>
+                                    </div>
+                                    <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        className="rounded-full hover:bg-white/10"
+                                        onClick={() => setSelectedExpense(null)}
+                                    >
+                                        <Plus className="h-6 w-6 rotate-45" />
+                                    </Button>
                                 </div>
-                                <div className="flex justify-between">
-                                    <span className="text-muted-foreground">Already Paid</span>
-                                    <span className="font-medium text-green-600">{formatCurrency(selectedExpense.paidAmount, user?.currency ?? undefined)}</span>
+
+                                <div className="bg-white/5 rounded-3xl p-6 border border-white/10 space-y-4">
+                                    <div className="flex justify-between items-end">
+                                        <div>
+                                            <p className="text-[10px] font-bold text-muted-foreground uppercase mb-1">Remaining Balance</p>
+                                            <p className="text-3xl font-black text-red-500">{formatCurrency(selectedExpense.amount - selectedExpense.paidAmount, user?.currency ?? undefined)}</p>
+                                        </div>
+                                        <div className="text-right">
+                                            <p className="text-[10px] font-bold text-muted-foreground uppercase mb-1">Total</p>
+                                            <p className="text-sm font-bold opacity-60">{formatCurrency(selectedExpense.amount, user?.currency ?? undefined)}</p>
+                                        </div>
+                                    </div>
                                 </div>
-                                <div className="flex justify-between border-t pt-2 mt-2">
-                                    <span className="text-muted-foreground font-semibold">Remaining Balance</span>
-                                    <span className="font-bold text-xl text-red-600">{formatCurrency(selectedExpense.amount - selectedExpense.paidAmount, user?.currency ?? undefined)}</span>
+
+                                <div className="space-y-6">
+                                    <div className="space-y-2">
+                                        <Label className="text-[10px] font-bold uppercase tracking-widest px-1">Amount to Pay ({user?.currency || "KES"}) *</Label>
+                                        <Input
+                                            className="rounded-2xl bg-white/5 border-white/10 h-14 text-xl font-bold"
+                                            type="number"
+                                            placeholder="0.00"
+                                            value={paidAmount}
+                                            onChange={(e) => setPaidAmount(e.target.value)}
+                                        />
+                                    </div>
+
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div className="space-y-2">
+                                            <Label className="text-[10px] font-bold uppercase tracking-widest px-1">Method</Label>
+                                            <Select value={paymentMethod} onValueChange={setPaymentMethod}>
+                                                <SelectTrigger className="rounded-2xl bg-white/5 border-white/10 h-12">
+                                                    <SelectValue />
+                                                </SelectTrigger>
+                                                <SelectContent className="rounded-2xl border-white/10 liquid-glass">
+                                                    <SelectItem value="m_pesa">M-Pesa</SelectItem>
+                                                    <SelectItem value="bank_transfer">Bank Transfer</SelectItem>
+                                                    <SelectItem value="cash">Cash</SelectItem>
+                                                    <SelectItem value="check">Check</SelectItem>
+                                                </SelectContent>
+                                            </Select>
+                                        </div>
+                                        <div className="space-y-2">
+                                            <Label className="text-[10px] font-bold uppercase tracking-widest px-1">Reference</Label>
+                                            <Input
+                                                className="rounded-2xl bg-white/5 border-white/10 h-12"
+                                                placeholder="TXN ID..."
+                                                value={reference}
+                                                onChange={(e) => setReference(e.target.value)}
+                                            />
+                                        </div>
+                                    </div>
+
+                                    <div className="space-y-2">
+                                        <Label className="text-[10px] font-bold uppercase tracking-widest px-1">Payment Notes</Label>
+                                        <Textarea
+                                            className="rounded-2xl bg-white/5 border-white/10 min-h-[80px] resize-none"
+                                            placeholder="Optional notes..."
+                                            value={paymentNotes}
+                                            onChange={(e) => setPaymentNotes(e.target.value)}
+                                        />
+                                    </div>
+                                </div>
+
+                                <div className="flex gap-4">
+                                    <Button
+                                        variant="outline"
+                                        className="flex-1 rounded-[1.5rem] h-14 font-bold border-white/10 hover:bg-white/5"
+                                        onClick={() => setSelectedExpense(null)}
+                                    >
+                                        Cancel
+                                    </Button>
+                                    <Button
+                                        className="flex-[2] rounded-[1.5rem] h-14 font-black text-lg shadow-xl shadow-primary/20"
+                                        onClick={() => recordPaymentMutation.mutate(selectedExpense.id)}
+                                        disabled={recordPaymentMutation.isPending || !paidAmount}
+                                    >
+                                        {recordPaymentMutation.isPending && <Loader2 className="mr-2 h-5 w-5 animate-spin" />}
+                                        {recordPaymentMutation.isPending ? "Confirming..." : "Confirm Payment"}
+                                    </Button>
                                 </div>
                             </div>
-
-                            <div className="space-y-2">
-                                <Label>Payment Amount ({user?.currency || "KES"}) *</Label>
-                                <Input
-                                    type="number"
-                                    placeholder="Enter amount paid..."
-                                    value={paidAmount}
-                                    onChange={(e) => setPaidAmount(e.target.value)}
-                                />
-                            </div>
-
-                            <div className="space-y-2">
-                                <Label>Payment Method</Label>
-                                <Select value={paymentMethod} onValueChange={setPaymentMethod}>
-                                    <SelectTrigger>
-                                        <SelectValue />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        <SelectItem value="m_pesa">M-Pesa</SelectItem>
-                                        <SelectItem value="bank_transfer">Bank Transfer</SelectItem>
-                                        <SelectItem value="cash">Cash</SelectItem>
-                                        <SelectItem value="check">Check</SelectItem>
-                                    </SelectContent>
-                                </Select>
-                            </div>
-
-                            <div className="space-y-2">
-                                <Label>Reference / Trans ID</Label>
-                                <Input
-                                    placeholder="Transaction reference..."
-                                    value={reference}
-                                    onChange={(e) => setReference(e.target.value)}
-                                />
-                            </div>
-
-                            <div className="space-y-2">
-                                <Label>Notes</Label>
-                                <Textarea
-                                    placeholder="Add notes..."
-                                    value={paymentNotes}
-                                    onChange={(e) => setPaymentNotes(e.target.value)}
-                                    rows={3}
-                                />
-                            </div>
-
-                            <div className="flex justify-end gap-3 pt-2">
-                                <Button variant="outline" onClick={() => setSelectedExpense(null)}>Cancel</Button>
-                                <Button
-                                    onClick={() => recordPaymentMutation.mutate(selectedExpense.id)}
-                                    disabled={recordPaymentMutation.isPending || !paidAmount}
-                                >
-                                    {recordPaymentMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                                    {recordPaymentMutation.isPending ? "Processing..." : "Confirm Payment"}
-                                </Button>
-                            </div>
-                        </div>
-                    )}
+                        )}
+                    </div>
                 </DialogContent>
             </Dialog>
 
