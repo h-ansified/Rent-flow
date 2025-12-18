@@ -151,7 +151,7 @@ export default function ForgotPassword() {
                                     disabled={isLoading}
                                 />
                                 {errors.email && (
-                                    <p className="text-sm text-destructive">{errors.email.message}</p>
+                                    <p className="text-sm text-destructive">{String(errors.email.message)}</p>
                                 )}
                             </div>
 

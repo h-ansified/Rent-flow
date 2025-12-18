@@ -483,7 +483,7 @@ class DatabaseStorage {
       ...recentPayments.map((p) => ({
         id: p.id,
         type: "payment" as const,
-        description: `${p.tenantFirstName} ${p.tenantLastName} paid $${p.amount}`,
+        description: `${p.tenantFirstName} ${p.tenantLastName} paid ${p.amount}`,
         timestamp: p.paidDate || "",
         propertyId: p.propertyId,
         tenantId: p.tenantId,

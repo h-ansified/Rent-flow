@@ -27,6 +27,8 @@ import {
   Cell,
 } from "recharts";
 import type { DashboardMetrics, RevenueData, Activity, Payment, Tenant } from "@shared/schema";
+import { useAuth } from "@/hooks/use-auth";
+import { formatCurrency, getCurrencySymbol } from "@/lib/currency-utils";
 
 function MetricCard({
   title,
@@ -57,8 +59,8 @@ function MetricCard({
           <div className="flex items-center gap-2 mt-1">
             {trend && trendValue && (
               <span className={`flex items-center text-xs font-medium ${trend === "up" ? "text-green-600 dark:text-green-400" :
-                  trend === "down" ? "text-red-600 dark:text-red-400" :
-                    "text-muted-foreground"
+                trend === "down" ? "text-red-600 dark:text-red-400" :
+                  "text-muted-foreground"
                 }`}>
                 {trend === "up" ? <TrendingUp className="h-3 w-3 mr-1" /> :
                   trend === "down" ? <TrendingDown className="h-3 w-3 mr-1" /> : null}
@@ -135,6 +137,9 @@ function PaymentStatusBadge({ status }: { status: string }) {
 }
 
 export default function Dashboard() {
+  const { user } = useAuth();
+  const currencySymbol = user?.currency || "KSH";
+
   const { data: metrics, isLoading: metricsLoading } = useQuery<DashboardMetrics>({
     queryKey: ["/api/dashboard/metrics"],
   });
@@ -196,7 +201,7 @@ export default function Dashboard() {
             />
             <MetricCard
               title="Monthly Revenue"
-              value={`KSH ${metrics.monthlyRevenue.toLocaleString()}`}
+              value={formatCurrency(metrics.monthlyRevenue, user?.currency ?? undefined)}
               subtitle="Total expected rent"
               icon={DollarSign}
               trend="up"
@@ -250,7 +255,7 @@ export default function Dashboard() {
                       tick={{ fontSize: 12 }}
                       tickLine={false}
                       axisLine={false}
-                      tickFormatter={(value) => `$${(value / 1000).toFixed(0)}k`}
+                      tickFormatter={(value) => `${getCurrencySymbol(user?.currency || undefined)}${(value / 1000).toFixed(0)}k`}
                       className="fill-muted-foreground"
                     />
                     <Tooltip
@@ -259,7 +264,7 @@ export default function Dashboard() {
                         border: "1px solid hsl(var(--border))",
                         borderRadius: "8px",
                       }}
-                      formatter={(value: number) => [`$${value.toLocaleString()}`, ""]}
+                      formatter={(value: number) => [formatCurrency(value, user?.currency ?? undefined), ""]}
                     />
                     <Area
                       type="monotone"
@@ -293,8 +298,8 @@ export default function Dashboard() {
             {metricsLoading ? (
               <Skeleton className="h-[300px] w-full" />
             ) : metrics ? (
-              <div className="h-[300px] flex flex-col items-center justify-center">
-                <ResponsiveContainer width="100%" height="80%">
+              <div className="h-[300px] w-full flex flex-col items-center justify-center">
+                <ResponsiveContainer width="100%" height={240}>
                   <PieChart>
                     <Pie
                       data={occupancyData}
@@ -390,7 +395,7 @@ export default function Dashboard() {
                     <p className="text-xs text-muted-foreground">{payment.propertyName} - Due {payment.dueDate}</p>
                   </div>
                   <div className="flex items-center gap-2">
-                    <span className="text-sm font-medium">KSH {payment.amount.toLocaleString()}</span>
+                    <span className="text-sm font-medium">{formatCurrency(payment.amount, user?.currency ?? undefined)}</span>
                     <PaymentStatusBadge status={payment.status} />
                   </div>
                 </div>

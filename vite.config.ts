@@ -3,7 +3,7 @@ import react from "@vitejs/plugin-react";
 import path from "path";
 
 export default defineConfig(async () => {
-  const plugins = [react()];
+  const plugins: any[] = [react()];
 
   // Only add Replit-specific plugins in development and when running on Replit
   if (process.env.NODE_ENV !== "production" && process.env.REPL_ID !== undefined) {

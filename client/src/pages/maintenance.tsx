@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
+import { formatCurrency, getCurrencySymbol } from "@/lib/currency-utils";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -68,6 +69,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import type { MaintenanceRequest, Property, Tenant } from "@shared/schema";
+import { useAuth } from "@/hooks/use-auth";
 
 const maintenanceFormSchema = z.object({
   propertyId: z.string().min(1, "Property is required"),
@@ -107,11 +109,13 @@ const statusColors: Record<string, string> = {
 function RequestCard({
   request,
   onStatusChange,
-  onDelete
+  onDelete,
+  currencySymbol
 }: {
   request: MaintenanceWithDetails;
   onStatusChange: (id: string, status: string) => void;
   onDelete: (id: string) => void;
+  currencySymbol: string;
 }) {
   const CategoryIcon = categoryIcons[request.category] || Wrench;
 
@@ -195,7 +199,7 @@ function RequestCard({
           {typeof request.cost === 'number' && (
             <div className="flex items-center gap-1.5 text-green-600 font-medium">
               <CreditCard className="h-3 w-3" />
-              Cost: KSH {Number(request.cost).toFixed(2)}
+              Cost: {formatCurrency(request.cost, currencySymbol)}
             </div>
           )}
         </div>
@@ -235,6 +239,7 @@ function KanbanColumn({
   isLoading,
   onStatusChange,
   onDelete,
+  currencySymbol,
 }: {
   title: string;
   status: string;
@@ -242,6 +247,7 @@ function KanbanColumn({
   isLoading: boolean;
   onStatusChange: (id: string, status: string) => void;
   onDelete: (id: string) => void;
+  currencySymbol: string;
 }) {
   const statusBadgeVariants: Record<string, "default" | "secondary" | "outline"> = {
     new: "default",
@@ -270,6 +276,7 @@ function KanbanColumn({
               request={request}
               onStatusChange={onStatusChange}
               onDelete={onDelete}
+              currencySymbol={currencySymbol}
             />
           ))
         ) : (
@@ -285,6 +292,8 @@ function KanbanColumn({
 }
 
 export default function Maintenance() {
+  const { user } = useAuth();
+  const currencySymbol = user?.currency || "KSH";
   const [searchQuery, setSearchQuery] = useState("");
   const [dialogOpen, setDialogOpen] = useState(false);
   const [deleteId, setDeleteId] = useState<string | null>(null);
@@ -557,7 +566,7 @@ export default function Maintenance() {
                     name="cost"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Cost (KSH) (Optional)</FormLabel>
+                        <FormLabel>Cost ({getCurrencySymbol(user?.currency || undefined)}) (Optional)</FormLabel>
                         <FormControl>
                           <Input
                             type="number"
@@ -609,6 +618,7 @@ export default function Maintenance() {
           isLoading={isLoading}
           onStatusChange={handleStatusChange}
           onDelete={setDeleteId}
+          currencySymbol={currencySymbol}
         />
         <KanbanColumn
           title="In Progress"
@@ -617,6 +627,7 @@ export default function Maintenance() {
           isLoading={isLoading}
           onStatusChange={handleStatusChange}
           onDelete={setDeleteId}
+          currencySymbol={currencySymbol}
         />
         <KanbanColumn
           title="Completed"
@@ -625,6 +636,7 @@ export default function Maintenance() {
           isLoading={isLoading}
           onStatusChange={handleStatusChange}
           onDelete={setDeleteId}
+          currencySymbol={currencySymbol}
         />
       </div>
 

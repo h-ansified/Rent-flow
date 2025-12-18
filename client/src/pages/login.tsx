@@ -8,8 +8,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Info, Mail, Lock, AlertCircle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/hooks/use-auth";
+import { Info, Mail, Lock, AlertCircle } from "lucide-react";
 
 const loginSchema = z.object({
     email: z.string().email("Invalid email address"),
@@ -24,6 +25,7 @@ export default function Login() {
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState("");
     const { toast } = useToast();
+    const { login } = useAuth();
 
     const { register, handleSubmit, formState: { errors }, setValue } = useForm<LoginForm>({
         resolver: zodResolver(loginSchema),
@@ -40,31 +42,19 @@ export default function Login() {
         setError("");
 
         try {
-            const response = await fetch("/api/auth/login", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    email: data.email,
-                    password: data.password,
-                    rememberMe: data.rememberMe || false,
-                }),
+            await login({
+                email: data.email,
+                password: data.password,
             });
-
-            const result = await response.json();
-
-            if (!response.ok) {
-                setError(result.error || "Login failed");
-                return;
-            }
 
             toast({
                 title: "Welcome back!",
-                description: `Logged in as ${result.user.email}`,
+                description: "You have successfully logged in.",
             });
 
             setLocation("/");
-        } catch (err) {
-            setError("Network error. Please try again.");
+        } catch (err: any) {
+            setError(err.message || "Login failed");
         } finally {
             setIsLoading(false);
         }
@@ -147,7 +137,7 @@ export default function Login() {
                                     disabled={isLoading}
                                 />
                                 {errors.email && (
-                                    <p className="text-sm text-destructive">{errors.email.message}</p>
+                                    <p className="text-sm text-destructive">{String(errors.email.message)}</p>
                                 )}
                             </div>
 
@@ -161,7 +151,7 @@ export default function Login() {
                                     disabled={isLoading}
                                 />
                                 {errors.password && (
-                                    <p className="text-sm text-destructive">{errors.password.message}</p>
+                                    <p className="text-sm text-destructive">{String(errors.password.message)}</p>
                                 )}
                             </div>
 

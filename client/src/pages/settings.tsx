@@ -286,7 +286,7 @@ export default function Settings() {
                   {...passwordForm.register("currentPassword")}
                 />
                 {passwordForm.formState.errors.currentPassword && (
-                  <p className="text-sm text-destructive">{passwordForm.formState.errors.currentPassword.message}</p>
+                  <p className="text-sm text-destructive">{String(passwordForm.formState.errors.currentPassword.message)}</p>
                 )}
               </div>
             </div>
@@ -299,7 +299,7 @@ export default function Settings() {
                   {...passwordForm.register("newPassword")}
                 />
                 {passwordForm.formState.errors.newPassword && (
-                  <p className="text-sm text-destructive">{passwordForm.formState.errors.newPassword.message}</p>
+                  <p className="text-sm text-destructive">{String(passwordForm.formState.errors.newPassword.message)}</p>
                 )}
               </div>
               <div className="space-y-2">
@@ -310,7 +310,7 @@ export default function Settings() {
                   {...passwordForm.register("confirmPassword")}
                 />
                 {passwordForm.formState.errors.confirmPassword && (
-                  <p className="text-sm text-destructive">{passwordForm.formState.errors.confirmPassword.message}</p>
+                  <p className="text-sm text-destructive">{String(passwordForm.formState.errors.confirmPassword.message)}</p>
                 )}
               </div>
             </div>

@@ -155,7 +155,7 @@ export default function Signup() {
                                     disabled={isLoading}
                                 />
                                 {errors.username && (
-                                    <p className="text-sm text-destructive">{errors.username.message}</p>
+                                    <p className="text-sm text-destructive">{String(errors.username.message)}</p>
                                 )}
                             </div>
 
@@ -169,7 +169,7 @@ export default function Signup() {
                                     disabled={isLoading}
                                 />
                                 {errors.email && (
-                                    <p className="text-sm text-destructive">{errors.email.message}</p>
+                                    <p className="text-sm text-destructive">{String(errors.email.message)}</p>
                                 )}
                             </div>
 
@@ -227,7 +227,7 @@ export default function Signup() {
                                     </div>
                                 )}
                                 {errors.password && (
-                                    <p className="text-sm text-destructive">{errors.password.message}</p>
+                                    <p className="text-sm text-destructive">{String(errors.password.message)}</p>
                                 )}
                             </div>
 
@@ -241,7 +241,7 @@ export default function Signup() {
                                     disabled={isLoading}
                                 />
                                 {errors.confirmPassword && (
-                                    <p className="text-sm text-destructive">{errors.confirmPassword.message}</p>
+                                    <p className="text-sm text-destructive">{String(errors.confirmPassword.message)}</p>
                                 )}
                             </div>
 

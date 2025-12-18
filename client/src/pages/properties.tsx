@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
+import { formatCurrency, getCurrencySymbol } from "@/lib/currency-utils";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -64,6 +65,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import type { Property } from "@shared/schema";
+import { useAuth } from "@/hooks/use-auth";
 
 const propertyFormSchema = z.object({
   name: z.string().min(1, "Property name is required"),
@@ -85,7 +87,7 @@ const propertyTypeIcons: Record<string, React.ElementType> = {
   townhouse: Warehouse,
 };
 
-function PropertyCard({ property, onDelete }: { property: Property; onDelete: (id: string) => void }) {
+function PropertyCard({ property, onDelete, currencySymbol }: { property: Property; onDelete: (id: string) => void; currencySymbol: string }) {
   const Icon = propertyTypeIcons[property.type] || Building2;
   const occupancyPercent = property.units > 0
     ? Math.round((property.occupiedUnits / property.units) * 100)
@@ -146,7 +148,7 @@ function PropertyCard({ property, onDelete }: { property: Property; onDelete: (i
           </div>
           <div className="flex items-center gap-2">
             <DollarSign className="h-4 w-4 text-muted-foreground" />
-            <span className="text-sm font-medium">KSH {property.monthlyRent.toLocaleString()}/mo</span>
+            <span className="text-sm font-medium">{formatCurrency(property.monthlyRent, currencySymbol)}/mo</span>
           </div>
         </div>
       </CardContent>
@@ -181,6 +183,8 @@ function PropertyCardSkeleton() {
 }
 
 export default function Properties() {
+  const { user } = useAuth();
+  const currencySymbol = user?.currency || "KSH";
   const [searchQuery, setSearchQuery] = useState("");
   const [typeFilter, setTypeFilter] = useState<string>("all");
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -392,7 +396,7 @@ export default function Properties() {
                     name="monthlyRent"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Monthly Rent (KSH)</FormLabel>
+                        <FormLabel>Monthly Rent ({getCurrencySymbol(user?.currency || undefined)})</FormLabel>
                         <FormControl>
                           <Input type="number" min="0" {...field} data-testid="input-property-rent" />
                         </FormControl>
@@ -451,7 +455,7 @@ export default function Properties() {
       ) : filteredProperties && filteredProperties.length > 0 ? (
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
           {filteredProperties.map((property) => (
-            <PropertyCard key={property.id} property={property} onDelete={setDeleteId} />
+            <PropertyCard key={property.id} property={property} onDelete={setDeleteId} currencySymbol={currencySymbol} />
           ))}
         </div>
       ) : (

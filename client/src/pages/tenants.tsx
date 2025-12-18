@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
+import { formatCurrency, getCurrencySymbol } from "@/lib/currency-utils";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -68,6 +69,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import type { Tenant, Property } from "@shared/schema";
+import { useAuth } from "@/hooks/use-auth";
 
 const tenantFormSchema = z.object({
   firstName: z.string().min(1, "First name is required"),
@@ -148,6 +150,9 @@ export default function Tenants() {
       rentAmount: 0,
     },
   });
+
+  const { user } = useAuth();
+  const currencySymbol = user?.currency || "KSH";
 
   const createMutation = useMutation({
     mutationFn: async (data: TenantFormValues) => {
@@ -354,7 +359,7 @@ export default function Tenants() {
                   name="rentAmount"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Monthly Rent (KSH)</FormLabel>
+                      <FormLabel>Monthly Rent ({getCurrencySymbol(user?.currency || undefined)})</FormLabel>
                       <FormControl>
                         <Input type="number" min="0" {...field} data-testid="input-tenant-rent" />
                       </FormControl>
@@ -447,7 +452,7 @@ export default function Tenants() {
                     <TableCell>{tenant.propertyName}</TableCell>
                     <TableCell>{tenant.unit || "-"}</TableCell>
                     <TableCell>{tenant.leaseEnd}</TableCell>
-                    <TableCell>KSH {tenant.rentAmount.toLocaleString()}</TableCell>
+                    <TableCell>{formatCurrency(tenant.rentAmount, user?.currency ?? undefined)}</TableCell>
                     <TableCell>
                       <TenantStatusBadge status={tenant.status} />
                     </TableCell>
@@ -562,7 +567,7 @@ export default function Tenants() {
 
                 <div>
                   <p className="text-sm text-muted-foreground">Monthly Rent</p>
-                  <p className="font-medium text-lg">${selectedTenant.rentAmount.toLocaleString()}</p>
+                  <p className="font-medium text-lg">{formatCurrency(selectedTenant.rentAmount, user?.currency ?? undefined)}</p>
                 </div>
               </div>
 

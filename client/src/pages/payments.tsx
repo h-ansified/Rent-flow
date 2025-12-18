@@ -36,11 +36,17 @@ import {
   CreditCard,
   Banknote,
   Plus,
+  Eye,
+  Mail,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { Textarea } from "@/components/ui/textarea";
-import type { Payment, Tenant } from "@shared/schema";
+import type { Payment, Tenant, Property } from "@shared/schema";
+import { useAuth } from "@/hooks/use-auth";
+import { formatCurrency, getCurrencySymbol } from "@/lib/currency-utils";
+import { InvoiceTemplate } from "@/components/invoice-template";
+import { createPortal } from "react-dom";
 
 type PaymentWithDetails = Payment & { tenantName: string; propertyName: string };
 
@@ -130,11 +136,23 @@ export default function Payments() {
   const [selectedPayment, setSelectedPayment] = useState<PaymentWithDetails | null>(null);
   const { toast } = useToast();
 
+  const { user } = useAuth();
+  const currencySymbol = user?.currency || "KSH";
   const [method, setMethod] = useState<string>("m_pesa");
   const [reference, setReference] = useState<string>("");
   const [notes, setNotes] = useState<string>("");
   const [paidAmount, setPaidAmount] = useState<string>("");
   const [viewingPayment, setViewingPayment] = useState<PaymentWithDetails | null>(null);
+  const [invoiceToPrint, setInvoiceToPrint] = useState<PaymentWithDetails | null>(null);
+
+  const handleDownloadInvoice = (payment: PaymentWithDetails) => {
+    setInvoiceToPrint(payment);
+    // Give react a moment to render the portal content
+    setTimeout(() => {
+      window.print();
+      setInvoiceToPrint(null);
+    }, 100);
+  };
 
   const [isNewDialogOpen, setIsNewDialogOpen] = useState(false);
   const [newPaymentTenantId, setNewPaymentTenantId] = useState<string>("");
@@ -184,10 +202,12 @@ export default function Payments() {
   const createPaymentMutation = useMutation({
     mutationFn: async (data: any) => {
       const tenant = tenants?.find(t => t.id === data.tenantId);
+      if (!tenant) throw new Error("Tenant not found");
       return apiRequest("POST", "/api/payments", {
         ...data,
-        propertyId: tenant?.propertyId,
+        propertyId: tenant.propertyId,
         status: "pending",
+        paidAmount: 0,
       });
     },
     onSuccess: () => {
@@ -219,9 +239,9 @@ export default function Payments() {
   });
 
   // Calculate metrics
-  const totalReceived = payments?.filter(p => p.status === "paid").reduce((sum, p) => sum + p.amount, 0) || 0;
-  const pendingAmount = payments?.filter(p => p.status === "pending").reduce((sum, p) => sum + p.amount, 0) || 0;
-  const overdueAmount = payments?.filter(p => p.status === "overdue").reduce((sum, p) => sum + p.amount, 0) || 0;
+  const totalReceived = payments?.filter(p => p.status === "paid").reduce((sum, p) => sum + (p.paidAmount || 0), 0) || 0;
+  const pendingAmount = payments?.filter(p => p.status === "pending").reduce((sum, p) => sum + (p.amount - (p.paidAmount || 0)), 0) || 0;
+  const overdueAmount = payments?.filter(p => p.status === "overdue").reduce((sum, p) => sum + (p.amount - (p.paidAmount || 0)), 0) || 0;
   const totalPayments = payments?.length || 0;
 
   return (
@@ -231,31 +251,37 @@ export default function Payments() {
           <h1 className="text-3xl font-semibold" data-testid="text-page-title">Payments</h1>
           <p className="text-muted-foreground mt-1">Track and manage rent payments</p>
         </div>
-        <Button onClick={() => setIsNewDialogOpen(true)} data-testid="button-new-payment">
-          <Plus className="h-4 w-4 mr-2" />
-          Record Payment
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" size="sm" onClick={() => toast({ title: "Feature coming soon", description: "Reports will be available soon." })}>
+            <Eye className="h-4 w-4 mr-2" />
+            Property Report
+          </Button>
+          <Button onClick={() => setIsNewDialogOpen(true)} data-testid="button-new-payment">
+            <Plus className="h-4 w-4 mr-2" />
+            Record Payment
+          </Button>
+        </div>
       </div>
 
       {/* Metrics */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         <MetricCard
           title="Total Received"
-          value={`KSH ${totalReceived.toLocaleString()}`}
+          value={formatCurrency(totalReceived, user?.currency ?? undefined)}
           subtitle="This month"
           icon={TrendingUp}
           color="bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400"
         />
         <MetricCard
           title="Pending"
-          value={`KSH ${pendingAmount.toLocaleString()}`}
+          value={formatCurrency(pendingAmount, user?.currency ?? undefined)}
           subtitle="Awaiting payment"
           icon={Clock}
           color="bg-yellow-100 dark:bg-yellow-900/30 text-yellow-600 dark:text-yellow-400"
         />
         <MetricCard
           title="Overdue"
-          value={`KSH ${overdueAmount.toLocaleString()}`}
+          value={formatCurrency(overdueAmount, user?.currency ?? undefined)}
           subtitle="Past due date"
           icon={AlertCircle}
           color="bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400"
@@ -325,9 +351,9 @@ export default function Payments() {
                   <TableRow key={payment.id} data-testid={`row-payment-${payment.id}`}>
                     <TableCell className="font-medium">{payment.tenantName}</TableCell>
                     <TableCell>{payment.propertyName}</TableCell>
-                    <TableCell className="font-medium">KSH {payment.amount.toLocaleString()}</TableCell>
-                    <TableCell className="text-green-600">KSH {(payment.paidAmount || 0).toLocaleString()}</TableCell>
-                    <TableCell className="font-bold text-red-600">KSH {(payment.amount - (payment.paidAmount || 0)).toLocaleString()}</TableCell>
+                    <TableCell className="font-medium">{formatCurrency(payment.amount, user?.currency ?? undefined)}</TableCell>
+                    <TableCell className="text-green-600">{formatCurrency(payment.paidAmount || 0, user?.currency ?? undefined)}</TableCell>
+                    <TableCell className="font-bold text-red-600">{formatCurrency(payment.amount - (payment.paidAmount || 0), user?.currency ?? undefined)}</TableCell>
                     <TableCell>{payment.dueDate}</TableCell>
                     <TableCell>
                       <PaymentMethodBadge method={payment.method} />
@@ -340,6 +366,14 @@ export default function Payments() {
                     </TableCell>
                     <TableCell>
                       <div className="flex flex-col gap-1">
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          title="Download Invoice"
+                          onClick={() => handleDownloadInvoice(payment)}
+                        >
+                          <Mail className="h-4 w-4" />
+                        </Button>
                         {payment.status !== "paid" && (
                           <Button
                             size="sm"
@@ -390,20 +424,20 @@ export default function Payments() {
               <div className="p-4 bg-muted rounded-md space-y-2">
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Total Amount</span>
-                  <span className="font-medium">KSH {selectedPayment.amount.toLocaleString()}</span>
+                  <span className="font-medium text-lg">{currencySymbol} {selectedPayment.amount.toLocaleString()}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Already Paid</span>
-                  <span className="font-medium text-green-600">KSH {(selectedPayment.paidAmount || 0).toLocaleString()}</span>
+                  <span className="font-medium text-green-600">{currencySymbol} {(selectedPayment.paidAmount || 0).toLocaleString()}</span>
                 </div>
                 <div className="flex justify-between border-t pt-2 mt-2">
-                  <span className="text-muted-foreground font-semibold">Remaining Balance</span>
-                  <span className="font-bold text-lg text-red-600">KSH {(selectedPayment.amount - (selectedPayment.paidAmount || 0)).toLocaleString()}</span>
+                  <span className="text-muted-foreground font-semibold font-lg">Remaining Balance</span>
+                  <span className="font-bold text-xl text-red-600">{currencySymbol} {(selectedPayment.amount - (selectedPayment.paidAmount || 0)).toLocaleString()}</span>
                 </div>
               </div>
 
               <div className="space-y-2">
-                <label className="text-sm font-medium">Payment Amount (KSH)</label>
+                <label className="text-sm font-medium">Payment Amount ({currencySymbol})</label>
                 <Input
                   type="number"
                   placeholder="Enter amount collected..."
@@ -492,7 +526,7 @@ export default function Payments() {
             </div>
 
             <div className="space-y-2">
-              <label className="text-sm font-medium">Amount (KSH)</label>
+              <label className="text-sm font-medium">Amount ({currencySymbol})</label>
               <Input
                 type="number"
                 placeholder="0.00"
@@ -548,15 +582,15 @@ export default function Payments() {
                 </div>
                 <div className="flex justify-between items-center text-lg border-t pt-2">
                   <span className="font-medium text-muted-foreground">Total Rent</span>
-                  <span className="font-bold">KSH {viewingPayment.amount.toLocaleString()}</span>
+                  <span className="font-bold">{currencySymbol} {viewingPayment.amount.toLocaleString()}</span>
                 </div>
                 <div className="flex justify-between items-center text-lg">
                   <span className="font-medium text-muted-foreground">Amount Paid</span>
-                  <span className="font-bold text-green-600">KSH {(viewingPayment.paidAmount || 0).toLocaleString()}</span>
+                  <span className="font-bold text-green-600">{currencySymbol} {(viewingPayment.paidAmount || 0).toLocaleString()}</span>
                 </div>
                 <div className="flex justify-between items-center text-lg border-t pt-2">
                   <span className="font-bold">Remaining Balance</span>
-                  <span className="font-extrabold text-red-600">KSH {(viewingPayment.amount - (viewingPayment.paidAmount || 0)).toLocaleString()}</span>
+                  <span className="font-extrabold text-red-600">{currencySymbol} {(viewingPayment.amount - (viewingPayment.paidAmount || 0)).toLocaleString()}</span>
                 </div>
               </div>
 
@@ -606,6 +640,24 @@ export default function Payments() {
           )}
         </DialogContent>
       </Dialog>
+
+      {/* Invoice Render Portal - Only visible when printing */}
+      {invoiceToPrint && user && createPortal(
+        <div className="fixed inset-0 z-[9999] bg-white print:static print:block hidden">
+          <style dangerouslySetInnerHTML={{
+            __html: `
+            @media print {
+              body * { visibility: hidden; }
+              #invoice-to-print, #invoice-to-print * { visibility: visible; }
+              #invoice-to-print { position: absolute; left: 0; top: 0; width: 100%; }
+            }
+          ` }} />
+          <div id="invoice-to-print">
+            <InvoiceTemplate payment={invoiceToPrint} user={user} />
+          </div>
+        </div>,
+        document.body
+      )}
     </div>
   );
 }
