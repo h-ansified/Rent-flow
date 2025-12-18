@@ -484,90 +484,89 @@ export default function Properties() {
           </Form>
         </DialogContent>
       </Dialog>
-    </div>
 
-      {/* Filters */ }
-  <div className="flex flex-col sm:flex-row gap-4">
-    <div className="relative flex-1">
-      <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-      <Input
-        placeholder="Search properties..."
-        value={searchQuery}
-        onChange={(e) => setSearchQuery(e.target.value)}
-        className="pl-10"
-        data-testid="input-search-properties"
-      />
-    </div>
-    <Select value={typeFilter} onValueChange={setTypeFilter}>
-      <SelectTrigger className="w-full sm:w-[180px]" data-testid="select-filter-type">
-        <SelectValue placeholder="Filter by type" />
-      </SelectTrigger>
-      <SelectContent>
-        <SelectItem value="all">All Types</SelectItem>
-        <SelectItem value="apartment">Apartment</SelectItem>
-        <SelectItem value="house">House</SelectItem>
-        <SelectItem value="condo">Condo</SelectItem>
-        <SelectItem value="townhouse">Townhouse</SelectItem>
-      </SelectContent>
-    </Select>
-  </div>
-
-  {/* Properties Grid */ }
-  {
-    isLoading ? (
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-        {[1, 2, 3, 4, 5, 6].map((i) => (
-          <PropertyCardSkeleton key={i} />
-        ))}
+      {/* Filters */}
+      <div className="flex flex-col sm:flex-row gap-4">
+        <div className="relative flex-1">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input
+            placeholder="Search properties..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="pl-10"
+            data-testid="input-search-properties"
+          />
+        </div>
+        <Select value={typeFilter} onValueChange={setTypeFilter}>
+          <SelectTrigger className="w-full sm:w-[180px]" data-testid="select-filter-type">
+            <SelectValue placeholder="Filter by type" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Types</SelectItem>
+            <SelectItem value="apartment">Apartment</SelectItem>
+            <SelectItem value="house">House</SelectItem>
+            <SelectItem value="condo">Condo</SelectItem>
+            <SelectItem value="townhouse">Townhouse</SelectItem>
+          </SelectContent>
+        </Select>
       </div>
-    ) : filteredProperties && filteredProperties.length > 0 ? (
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-        {filteredProperties.map((property) => (
-          <PropertyCard key={property.id} property={property} onDelete={setDeleteId} onEdit={handleEdit} currencySymbol={currencySymbol} />
-        ))}
-      </div>
-    ) : (
-      <Card className="py-12">
-        <CardContent className="text-center">
-          <Building2 className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-          <h3 className="text-lg font-medium mb-2">No properties found</h3>
-          <p className="text-muted-foreground mb-4">
-            {searchQuery || typeFilter !== "all"
-              ? "Try adjusting your search or filters"
-              : "Get started by adding your first property"}
-          </p>
-          {!searchQuery && typeFilter === "all" && (
-            <Button onClick={() => setDialogOpen(true)} data-testid="button-add-first-property">
-              <Plus className="h-4 w-4 mr-2" />
-              Add Your First Property
-            </Button>
-          )}
-        </CardContent>
-      </Card>
-    )
-  }
 
-  {/* Delete Confirmation Dialog */ }
-  <AlertDialog open={!!deleteId} onOpenChange={() => setDeleteId(null)}>
-    <AlertDialogContent>
-      <AlertDialogHeader>
-        <AlertDialogTitle>Delete Property</AlertDialogTitle>
-        <AlertDialogDescription>
-          Are you sure you want to delete this property? This action cannot be undone.
-        </AlertDialogDescription>
-      </AlertDialogHeader>
-      <AlertDialogFooter>
-        <AlertDialogCancel data-testid="button-cancel-delete">Cancel</AlertDialogCancel>
-        <AlertDialogAction
-          onClick={() => deleteId && deleteMutation.mutate(deleteId)}
-          className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-          data-testid="button-confirm-delete"
-        >
-          {deleteMutation.isPending ? "Deleting..." : "Delete"}
-        </AlertDialogAction>
-      </AlertDialogFooter>
-    </AlertDialogContent>
-  </AlertDialog>
-    </div >
+      {/* Properties Grid */}
+      {
+        isLoading ? (
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+            {[1, 2, 3, 4, 5, 6].map((i) => (
+              <PropertyCardSkeleton key={i} />
+            ))}
+          </div>
+        ) : filteredProperties && filteredProperties.length > 0 ? (
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+            {filteredProperties.map((property) => (
+              <PropertyCard key={property.id} property={property} onDelete={setDeleteId} onEdit={handleEdit} currencySymbol={currencySymbol} />
+            ))}
+          </div>
+        ) : (
+          <Card className="py-12">
+            <CardContent className="text-center">
+              <Building2 className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+              <h3 className="text-lg font-medium mb-2">No properties found</h3>
+              <p className="text-muted-foreground mb-4">
+                {searchQuery || typeFilter !== "all"
+                  ? "Try adjusting your search or filters"
+                  : "Get started by adding your first property"}
+              </p>
+              {!searchQuery && typeFilter === "all" && (
+                <Button onClick={() => setDialogOpen(true)} data-testid="button-add-first-property">
+                  <Plus className="h-4 w-4 mr-2" />
+                  Add Your First Property
+                </Button>
+              )}
+            </CardContent>
+          </Card>
+        )
+      }
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={!!deleteId} onOpenChange={() => setDeleteId(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Property</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete this property? This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel data-testid="button-cancel-delete">Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => deleteId && deleteMutation.mutate(deleteId)}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              data-testid="button-confirm-delete"
+            >
+              {deleteMutation.isPending ? "Deleting..." : "Delete"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </div>
   );
 }
