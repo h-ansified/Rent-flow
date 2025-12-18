@@ -39,11 +39,22 @@ import {
   Eye,
   Mail,
   FileText,
+  Trash2,
 } from "lucide-react";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { Textarea } from "@/components/ui/textarea";
-import type { Payment, Tenant, Property, Expense } from "@shared/schema";
+import type { Payment, Tenant, Property, Expense, PaymentHistory } from "@shared/schema";
 import { useAuth } from "@/hooks/use-auth";
 import { formatCurrency, getCurrencySymbol } from "@/lib/currency-utils";
 import { InvoiceTemplate } from "@/components/invoice-template";
@@ -146,6 +157,18 @@ export default function Payments() {
   const [paidAmount, setPaidAmount] = useState<string>("");
   const [viewingPayment, setViewingPayment] = useState<PaymentWithDetails | null>(null);
   const [invoiceToPrint, setInvoiceToPrint] = useState<PaymentWithDetails | null>(null);
+  const [deletePaymentId, setDeletePaymentId] = useState<string | null>(null);
+
+  const canDeletePayment = (paymentDateStr: string) => {
+    try {
+      const paymentDate = new Date(paymentDateStr);
+      const now = new Date();
+      const monthDiff = (now.getFullYear() - paymentDate.getFullYear()) * 12 + (now.getMonth() - paymentDate.getMonth());
+      return monthDiff <= 1 && monthDiff >= 0;
+    } catch (e) {
+      return false;
+    }
+  };
 
   const handleDownloadInvoice = (payment: PaymentWithDetails) => {
     setInvoiceToPrint(payment);
@@ -202,15 +225,19 @@ export default function Payments() {
     queryKey: ["/api/tenants"],
   });
 
+  const { data: paymentHistory } = useQuery<PaymentHistory[]>({
+    queryKey: [`/api/payments/${viewingPayment?.id}/transactions`],
+    enabled: !!viewingPayment?.id,
+  });
+
   const markPaidMutation = useMutation({
     mutationFn: async (paymentId: string) => {
-      return apiRequest("PATCH", `/api/payments/${paymentId}`, {
-        status: "paid",
-        paidDate: new Date().toISOString().split("T")[0],
+      return apiRequest("POST", `/api/payments/${paymentId}/transactions`, {
+        amount: parseFloat(paidAmount),
+        date: new Date().toISOString().split("T")[0],
         method,
         reference,
         notes,
-        paidAmount: parseFloat(paidAmount),
       });
     },
     onSuccess: () => {
@@ -221,14 +248,14 @@ export default function Payments() {
       setNotes("");
       setPaidAmount("");
       toast({
-        title: "Payment recorded",
-        description: "The payment has been marked as paid.",
+        title: "Payment Recorded",
+        description: "Transaction added successfully.",
       });
     },
     onError: () => {
       toast({
         title: "Error",
-        description: "Failed to record payment. Please try again.",
+        description: "Failed to record transaction. Please try again.",
         variant: "destructive",
       });
     },
@@ -261,6 +288,28 @@ export default function Payments() {
       toast({
         title: "Error",
         description: "Failed to create payment record.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const deletePaymentMutation = useMutation({
+    mutationFn: async (id: string) => {
+      return apiRequest("DELETE", `/api/payments/${id}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/payments"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/dashboard"] });
+      setDeletePaymentId(null);
+      toast({
+        title: "Payment deleted",
+        description: "The payment record has been removed.",
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Failed to delete payment record. Please try again.",
         variant: "destructive",
       });
     },
@@ -424,7 +473,20 @@ export default function Payments() {
                           onClick={() => setViewingPayment(payment)}
                         >
                           View Details
+                        >
+                          View Details
                         </Button>
+                        {canDeletePayment(payment.dueDate) && (
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                            onClick={() => setDeletePaymentId(payment.id)}
+                            title="Delete Record"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        )}
                       </div>
                     </TableCell>
                   </TableRow>
@@ -668,6 +730,39 @@ export default function Payments() {
                 </div>
               )}
 
+              {/* Payment History Table */}
+              <div className="border-t pt-4">
+                <h4 className="font-semibold mb-2 flex items-center gap-2">
+                  <Clock className="h-4 w-4" /> Transaction History
+                </h4>
+                {paymentHistory && paymentHistory.length > 0 ? (
+                  <div className="border rounded-md overflow-hidden">
+                    <Table>
+                      <TableHeader>
+                        <TableRow className="bg-muted/50">
+                          <TableHead className="h-8">Date</TableHead>
+                          <TableHead className="h-8">Amount</TableHead>
+                          <TableHead className="h-8">Method</TableHead>
+                          <TableHead className="h-8">Ref</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {paymentHistory.map((h) => (
+                          <TableRow key={h.id}>
+                            <TableCell className="py-2">{h.date}</TableCell>
+                            <TableCell className="py-2 font-medium">{currencySymbol} {h.amount.toLocaleString()}</TableCell>
+                            <TableCell className="py-2 capitalize">{h.method?.replace('_', ' ') || '-'}</TableCell>
+                            <TableCell className="py-2 font-mono text-xs">{h.reference || '-'}</TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                ) : (
+                  <p className="text-sm text-muted-foreground italic">No transactions recorded yet.</p>
+                )}
+              </div>
+
               <div className="flex justify-end">
                 <Button variant="outline" onClick={() => setViewingPayment(null)}>Close</Button>
               </div>
@@ -693,6 +788,26 @@ export default function Payments() {
         </div>,
         document.body
       )}
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={!!deletePaymentId} onOpenChange={() => setDeletePaymentId(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Payment Record</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete this payment record? This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={() => deletePaymentId && deletePaymentMutation.mutate(deletePaymentId)}
+            >
+              {deletePaymentMutation.isPending ? "Deleting..." : "Delete"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

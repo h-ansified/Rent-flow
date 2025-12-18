@@ -2,7 +2,7 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import rateLimit from "express-rate-limit";
 import { storage } from "./storage";
-import { insertPropertySchema, insertTenantSchema, insertPaymentSchema, insertMaintenanceRequestSchema, insertExpenseSchema } from "@shared/schema";
+import { insertPropertySchema, insertTenantSchema, insertPaymentSchema, insertPaymentHistorySchema, insertMaintenanceRequestSchema, insertExpenseSchema } from "@shared/schema";
 import { authRouter, requireAuth } from "./auth";
 
 // Rate limiting for auth endpoints (prevent brute force)
@@ -267,6 +267,62 @@ export async function registerRoutes(
       res.status(204).send();
     } catch (error) {
       res.status(500).json({ error: "Failed to delete payment" });
+    }
+
+  });
+
+  app.get("/api/payments/:id/transactions", requireAuth, async (req, res) => {
+    try {
+      const userId = req.session.userId!;
+      const payment = await storage.getPayment(req.params.id, userId);
+      if (!payment) {
+        return res.status(404).json({ error: "Payment not found" });
+      }
+      const history = await storage.getPaymentHistory(req.params.id);
+      res.json(history);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch payment history" });
+    }
+  });
+
+  app.post("/api/payments/:id/transactions", requireAuth, async (req, res) => {
+    try {
+      const userId = req.session.userId!;
+      const paymentId = req.params.id;
+      const payment = await storage.getPayment(paymentId, userId);
+      if (!payment) {
+        return res.status(404).json({ error: "Payment not found" });
+      }
+
+      const parsed = insertPaymentHistorySchema.safeParse({ ...req.body, paymentId });
+      if (!parsed.success) {
+        return res.status(400).json({ error: "Invalid transaction data", details: parsed.error.errors });
+      }
+
+      await storage.createPaymentHistory(parsed.data);
+
+      // Update parent payment status and total
+      const history = await storage.getPaymentHistory(paymentId);
+      const totalPaid = history.reduce((sum, h) => sum + h.amount, 0);
+
+      let newStatus = "pending";
+      if (totalPaid >= payment.amount) {
+        newStatus = "paid";
+      } else if (totalPaid > 0) {
+        newStatus = "partial"; // Assuming 'partial' is valid in schema now
+      }
+
+      const updated = await storage.updatePayment(paymentId, {
+        paidAmount: totalPaid,
+        status: newStatus,
+        paidDate: new Date().toISOString().split("T")[0], // Update last paid date
+        method: parsed.data.method, // Update last method
+        reference: parsed.data.reference, // Update last ref
+      }, userId);
+
+      res.status(201).json(updated);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to record transaction" });
     }
   });
 

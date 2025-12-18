@@ -45,8 +45,8 @@ export function useAuth() {
             }
             return response.json();
         },
-        onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: ["auth"] });
+        onSuccess: async () => {
+            await queryClient.invalidateQueries({ queryKey: ["auth"] });
         },
     });
 
@@ -64,8 +64,8 @@ export function useAuth() {
             }
             return response.json();
         },
-        onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: ["auth"] });
+        onSuccess: async () => {
+            await queryClient.invalidateQueries({ queryKey: ["auth"] });
         },
     });
 

@@ -1,10 +1,11 @@
 import { db } from "./db";
 import {
-  users, properties, tenants, payments, maintenanceRequests, expenses,
+  users, properties, tenants, payments, paymentHistory, maintenanceRequests, expenses,
   type User, type InsertUser,
   type Property, type InsertProperty,
   type Tenant, type InsertTenant,
   type Payment, type InsertPayment,
+  type PaymentHistory, type InsertPaymentHistory,
   type MaintenanceRequest, type InsertMaintenanceRequest,
   type Expense, type InsertExpense,
   type DashboardMetrics, type RevenueData, type Activity
@@ -284,6 +285,22 @@ class DatabaseStorage {
     return result.length > 0;
   }
 
+  async createPaymentHistory(record: InsertPaymentHistory): Promise<PaymentHistory> {
+    const [history] = await db
+      .insert(paymentHistory)
+      .values(record)
+      .returning();
+    return history;
+  }
+
+  async getPaymentHistory(paymentId: string): Promise<PaymentHistory[]> {
+    return await db
+      .select()
+      .from(paymentHistory)
+      .where(eq(paymentHistory.paymentId, paymentId))
+      .orderBy(desc(paymentHistory.date));
+  }
+
   // ===================
   // MAINTENANCE METHODS
   // ===================
@@ -478,22 +495,22 @@ class DatabaseStorage {
 
   async getRecentActivities(userId: string): Promise<Activity[]> {
     // This would ideally come from an activity log table
-    // For now, return recent payments and maintenance as activities
+    // For now, return recent payments, maintenance, expenses, and tenant activities
     const recentPayments = await db
       .select({
         id: payments.id,
         amount: payments.amount,
         paidDate: payments.paidDate,
-        propertyId: payments.propertyId,
-        tenantId: payments.tenantId,
         tenantFirstName: tenants.firstName,
         tenantLastName: tenants.lastName,
+        propertyId: payments.propertyId,
+        tenantId: payments.tenantId,
       })
       .from(payments)
       .leftJoin(tenants, eq(payments.tenantId, tenants.id))
       .where(and(eq(payments.userId, userId), sql`${payments.paidDate} IS NOT NULL`))
       .orderBy(desc(payments.paidDate))
-      .limit(3);
+      .limit(5);
 
     const recentMaintenance = await db
       .select({
@@ -505,13 +522,39 @@ class DatabaseStorage {
       .from(maintenanceRequests)
       .where(eq(maintenanceRequests.userId, userId))
       .orderBy(desc(maintenanceRequests.createdAt))
-      .limit(3);
+      .limit(5);
+
+    const recentExpenses = await db
+      .select({
+        id: expenses.id,
+        title: expenses.title,
+        amount: expenses.amount,
+        createdAt: expenses.createdAt,
+        propertyId: expenses.propertyId,
+      })
+      .from(expenses)
+      .where(eq(expenses.userId, userId))
+      .orderBy(desc(expenses.createdAt))
+      .limit(5);
+
+    const newTenants = await db
+      .select({
+        id: tenants.id,
+        firstName: tenants.firstName,
+        lastName: tenants.lastName,
+        propertyId: tenants.propertyId,
+        leaseStart: tenants.leaseStart,
+      })
+      .from(tenants)
+      .where(eq(tenants.userId, userId))
+      .orderBy(desc(tenants.leaseStart))
+      .limit(5);
 
     const activities: Activity[] = [
       ...recentPayments.map((p) => ({
         id: p.id,
         type: "payment" as const,
-        description: `${p.tenantFirstName} ${p.tenantLastName} paid ${p.amount}`,
+        description: `Payment received: ${p.tenantFirstName} ${p.tenantLastName || ''} paid ${p.amount}`,
         timestamp: p.paidDate || "",
         propertyId: p.propertyId,
         tenantId: p.tenantId,
@@ -519,13 +562,30 @@ class DatabaseStorage {
       ...recentMaintenance.map((m) => ({
         id: m.id,
         type: "maintenance" as const,
-        description: `New maintenance request: ${m.title}`,
+        description: `Maintenance Request: ${m.title}`,
         timestamp: m.createdAt,
         propertyId: m.propertyId,
       })),
+      ...recentExpenses.map((e) => ({
+        id: e.id,
+        type: "maintenance" as const, // Categorize expenses under maintenance for icon consistency
+        description: `Expense Recorded: ${e.title} (${e.amount})`,
+        timestamp: e.createdAt.toISOString(),
+        propertyId: e.propertyId || undefined,
+      })),
+      ...newTenants.map((t) => ({
+        id: t.id,
+        type: "tenant" as const,
+        description: `New Tenant: ${t.firstName} ${t.lastName}`,
+        timestamp: t.leaseStart,
+        propertyId: t.propertyId,
+      })),
     ];
 
-    return activities.slice(0, 6);
+    // Unified sort by timestamp (newest first)
+    return activities
+      .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
+      .slice(0, 20);
   }
 
   async getUpcomingPayments(

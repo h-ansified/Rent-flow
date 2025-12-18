@@ -87,7 +87,7 @@ const propertyTypeIcons: Record<string, React.ElementType> = {
   townhouse: Warehouse,
 };
 
-function PropertyCard({ property, onDelete, currencySymbol }: { property: Property; onDelete: (id: string) => void; currencySymbol: string }) {
+function PropertyCard({ property, onDelete, onEdit, currencySymbol }: { property: Property; onDelete: (id: string) => void; onEdit: (property: Property) => void; currencySymbol: string }) {
   const Icon = propertyTypeIcons[property.type] || Building2;
   const occupancyPercent = property.units > 0
     ? Math.round((property.occupiedUnits / property.units) * 100)
@@ -120,9 +120,9 @@ function PropertyCard({ property, onDelete, currencySymbol }: { property: Proper
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
-                <DropdownMenuItem>
+                <DropdownMenuItem onClick={() => onEdit(property)}>
                   <Eye className="h-4 w-4 mr-2" />
-                  View Details
+                  Edit Details
                 </DropdownMenuItem>
                 <DropdownMenuItem
                   className="text-destructive"
@@ -235,6 +235,57 @@ export default function Properties() {
     },
   });
 
+
+  const updateMutation = useMutation({
+    mutationFn: async (values: PropertyFormValues & { id: string }) => {
+      const { id, ...data } = values;
+      return apiRequest("PATCH", `/api/properties/${id}`, data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/properties"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/dashboard"] });
+      setDialogOpen(false);
+      setEditingProperty(null);
+      form.reset();
+      toast({
+        title: "Property updated",
+        description: "The property details have been updated.",
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Failed to update property. Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const [editingProperty, setEditingProperty] = useState<Property | null>(null);
+
+  const handleEdit = (property: Property) => {
+    setEditingProperty(property);
+    form.reset({
+      name: property.name,
+      address: property.address,
+      city: property.city,
+      state: property.state,
+      zipCode: property.zipCode,
+      type: property.type,
+      units: property.units,
+      monthlyRent: property.monthlyRent,
+    });
+    setDialogOpen(true);
+  };
+
+  const onSubmit = (data: PropertyFormValues) => {
+    if (editingProperty) {
+      updateMutation.mutate({ ...data, id: editingProperty.id });
+    } else {
+      createMutation.mutate(data);
+    }
+  };
+
   const deleteMutation = useMutation({
     mutationFn: async (id: string) => {
       return apiRequest("DELETE", `/api/properties/${id}`);
@@ -272,27 +323,70 @@ export default function Properties() {
           <h1 className="text-3xl font-semibold" data-testid="text-page-title">Properties</h1>
           <p className="text-muted-foreground mt-1">Manage your rental properties</p>
         </div>
-        <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-          <DialogTrigger asChild>
-            <Button data-testid="button-add-property">
-              <Plus className="h-4 w-4 mr-2" />
-              Add Property
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="max-w-lg">
-            <DialogHeader>
-              <DialogTitle>Add New Property</DialogTitle>
-            </DialogHeader>
-            <Form {...form}>
-              <form onSubmit={form.handleSubmit((data) => createMutation.mutate(data))} className="space-y-4">
+      </div>
+      <Dialog open={dialogOpen} onOpenChange={(open) => {
+        setDialogOpen(open);
+        if (!open) {
+          setEditingProperty(null);
+          form.reset({
+            name: "",
+            address: "",
+            city: "",
+            state: "",
+            zipCode: "",
+            type: "",
+            units: 1,
+            monthlyRent: 0,
+          });
+        }
+      }}>
+        <DialogTrigger asChild>
+          <Button data-testid="button-add-property">
+            <Plus className="h-4 w-4 mr-2" />
+            Add Property
+          </Button>
+        </DialogTrigger>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>{editingProperty ? "Edit Property" : "Add New Property"}</DialogTitle>
+          </DialogHeader>
+          <Form {...form}>
+            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+              <FormField
+                control={form.control}
+                name="name"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Property Name</FormLabel>
+                    <FormControl>
+                      <Input placeholder="Sunset Apartments" {...field} data-testid="input-property-name" />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="address"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Street Address</FormLabel>
+                    <FormControl>
+                      <Input placeholder="123 Main Street" {...field} data-testid="input-property-address" />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <div className="grid grid-cols-2 gap-4">
                 <FormField
                   control={form.control}
-                  name="name"
+                  name="city"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Property Name</FormLabel>
+                      <FormLabel>City</FormLabel>
                       <FormControl>
-                        <Input placeholder="Sunset Apartments" {...field} data-testid="input-property-name" />
+                        <Input placeholder="Los Angeles" {...field} data-testid="input-property-city" />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -300,205 +394,180 @@ export default function Properties() {
                 />
                 <FormField
                   control={form.control}
-                  name="address"
+                  name="state"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Street Address</FormLabel>
+                      <FormLabel>State</FormLabel>
                       <FormControl>
-                        <Input placeholder="123 Main Street" {...field} data-testid="input-property-address" />
+                        <Input placeholder="CA" {...field} data-testid="input-property-state" />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
                   )}
                 />
-                <div className="grid grid-cols-2 gap-4">
-                  <FormField
-                    control={form.control}
-                    name="city"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>City</FormLabel>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <FormField
+                  control={form.control}
+                  name="zipCode"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Zip Code</FormLabel>
+                      <FormControl>
+                        <Input placeholder="90210" {...field} data-testid="input-property-zip" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="type"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Property Type</FormLabel>
+                      <Select onValueChange={field.onChange} defaultValue={field.value}>
                         <FormControl>
-                          <Input placeholder="Los Angeles" {...field} data-testid="input-property-city" />
+                          <SelectTrigger data-testid="select-property-type">
+                            <SelectValue placeholder="Select type" />
+                          </SelectTrigger>
                         </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={form.control}
-                    name="state"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>State</FormLabel>
-                        <FormControl>
-                          <Input placeholder="CA" {...field} data-testid="input-property-state" />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <FormField
-                    control={form.control}
-                    name="zipCode"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Zip Code</FormLabel>
-                        <FormControl>
-                          <Input placeholder="90210" {...field} data-testid="input-property-zip" />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={form.control}
-                    name="type"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Property Type</FormLabel>
-                        <Select onValueChange={field.onChange} defaultValue={field.value}>
-                          <FormControl>
-                            <SelectTrigger data-testid="select-property-type">
-                              <SelectValue placeholder="Select type" />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent>
-                            <SelectItem value="apartment">Apartment</SelectItem>
-                            <SelectItem value="house">House</SelectItem>
-                            <SelectItem value="condo">Condo</SelectItem>
-                            <SelectItem value="townhouse">Townhouse</SelectItem>
-                          </SelectContent>
-                        </Select>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <FormField
-                    control={form.control}
-                    name="units"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Number of Units</FormLabel>
-                        <FormControl>
-                          <Input type="number" min="1" {...field} data-testid="input-property-units" />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={form.control}
-                    name="monthlyRent"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Monthly Rent ({getCurrencySymbol(user?.currency || undefined)})</FormLabel>
-                        <FormControl>
-                          <Input type="number" min="0" {...field} data-testid="input-property-rent" />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                </div>
-                <div className="flex justify-end gap-3 pt-4">
-                  <Button type="button" variant="outline" onClick={() => setDialogOpen(false)} data-testid="button-cancel">
-                    Cancel
-                  </Button>
-                  <Button type="submit" disabled={createMutation.isPending} data-testid="button-submit-property">
-                    {createMutation.isPending ? "Adding..." : "Add Property"}
-                  </Button>
-                </div>
-              </form>
-            </Form>
-          </DialogContent>
-        </Dialog>
-      </div>
-
-      {/* Filters */}
-      <div className="flex flex-col sm:flex-row gap-4">
-        <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input
-            placeholder="Search properties..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-10"
-            data-testid="input-search-properties"
-          />
-        </div>
-        <Select value={typeFilter} onValueChange={setTypeFilter}>
-          <SelectTrigger className="w-full sm:w-[180px]" data-testid="select-filter-type">
-            <SelectValue placeholder="Filter by type" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Types</SelectItem>
-            <SelectItem value="apartment">Apartment</SelectItem>
-            <SelectItem value="house">House</SelectItem>
-            <SelectItem value="condo">Condo</SelectItem>
-            <SelectItem value="townhouse">Townhouse</SelectItem>
-          </SelectContent>
-        </Select>
-      </div>
-
-      {/* Properties Grid */}
-      {isLoading ? (
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {[1, 2, 3, 4, 5, 6].map((i) => (
-            <PropertyCardSkeleton key={i} />
-          ))}
-        </div>
-      ) : filteredProperties && filteredProperties.length > 0 ? (
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {filteredProperties.map((property) => (
-            <PropertyCard key={property.id} property={property} onDelete={setDeleteId} currencySymbol={currencySymbol} />
-          ))}
-        </div>
-      ) : (
-        <Card className="py-12">
-          <CardContent className="text-center">
-            <Building2 className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-            <h3 className="text-lg font-medium mb-2">No properties found</h3>
-            <p className="text-muted-foreground mb-4">
-              {searchQuery || typeFilter !== "all"
-                ? "Try adjusting your search or filters"
-                : "Get started by adding your first property"}
-            </p>
-            {!searchQuery && typeFilter === "all" && (
-              <Button onClick={() => setDialogOpen(true)} data-testid="button-add-first-property">
-                <Plus className="h-4 w-4 mr-2" />
-                Add Your First Property
-              </Button>
-            )}
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Delete Confirmation Dialog */}
-      <AlertDialog open={!!deleteId} onOpenChange={() => setDeleteId(null)}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Delete Property</AlertDialogTitle>
-            <AlertDialogDescription>
-              Are you sure you want to delete this property? This action cannot be undone.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel data-testid="button-cancel-delete">Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={() => deleteId && deleteMutation.mutate(deleteId)}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-              data-testid="button-confirm-delete"
-            >
-              {deleteMutation.isPending ? "Deleting..." : "Delete"}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+                        <SelectContent>
+                          <SelectItem value="apartment">Apartment</SelectItem>
+                          <SelectItem value="house">House</SelectItem>
+                          <SelectItem value="condo">Condo</SelectItem>
+                          <SelectItem value="townhouse">Townhouse</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <FormField
+                  control={form.control}
+                  name="units"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Number of Units</FormLabel>
+                      <FormControl>
+                        <Input type="number" min="1" {...field} data-testid="input-property-units" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="monthlyRent"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Monthly Rent ({getCurrencySymbol(user?.currency || undefined)})</FormLabel>
+                      <FormControl>
+                        <Input type="number" min="0" {...field} data-testid="input-property-rent" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+              <div className="flex justify-end gap-3 pt-4">
+                <Button type="button" variant="outline" onClick={() => setDialogOpen(false)} data-testid="button-cancel">
+                  Cancel
+                </Button>
+                <Button type="submit" disabled={createMutation.isPending || updateMutation.isPending} data-testid="button-submit-property">
+                  {createMutation.isPending || updateMutation.isPending ? "Saving..." : (editingProperty ? "Update Property" : "Add Property")}
+                </Button>
+              </div>
+            </form>
+          </Form>
+        </DialogContent>
+      </Dialog>
     </div>
+
+      {/* Filters */ }
+  <div className="flex flex-col sm:flex-row gap-4">
+    <div className="relative flex-1">
+      <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+      <Input
+        placeholder="Search properties..."
+        value={searchQuery}
+        onChange={(e) => setSearchQuery(e.target.value)}
+        className="pl-10"
+        data-testid="input-search-properties"
+      />
+    </div>
+    <Select value={typeFilter} onValueChange={setTypeFilter}>
+      <SelectTrigger className="w-full sm:w-[180px]" data-testid="select-filter-type">
+        <SelectValue placeholder="Filter by type" />
+      </SelectTrigger>
+      <SelectContent>
+        <SelectItem value="all">All Types</SelectItem>
+        <SelectItem value="apartment">Apartment</SelectItem>
+        <SelectItem value="house">House</SelectItem>
+        <SelectItem value="condo">Condo</SelectItem>
+        <SelectItem value="townhouse">Townhouse</SelectItem>
+      </SelectContent>
+    </Select>
+  </div>
+
+  {/* Properties Grid */ }
+  {
+    isLoading ? (
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+        {[1, 2, 3, 4, 5, 6].map((i) => (
+          <PropertyCardSkeleton key={i} />
+        ))}
+      </div>
+    ) : filteredProperties && filteredProperties.length > 0 ? (
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+        {filteredProperties.map((property) => (
+          <PropertyCard key={property.id} property={property} onDelete={setDeleteId} onEdit={handleEdit} currencySymbol={currencySymbol} />
+        ))}
+      </div>
+    ) : (
+      <Card className="py-12">
+        <CardContent className="text-center">
+          <Building2 className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+          <h3 className="text-lg font-medium mb-2">No properties found</h3>
+          <p className="text-muted-foreground mb-4">
+            {searchQuery || typeFilter !== "all"
+              ? "Try adjusting your search or filters"
+              : "Get started by adding your first property"}
+          </p>
+          {!searchQuery && typeFilter === "all" && (
+            <Button onClick={() => setDialogOpen(true)} data-testid="button-add-first-property">
+              <Plus className="h-4 w-4 mr-2" />
+              Add Your First Property
+            </Button>
+          )}
+        </CardContent>
+      </Card>
+    )
+  }
+
+  {/* Delete Confirmation Dialog */ }
+  <AlertDialog open={!!deleteId} onOpenChange={() => setDeleteId(null)}>
+    <AlertDialogContent>
+      <AlertDialogHeader>
+        <AlertDialogTitle>Delete Property</AlertDialogTitle>
+        <AlertDialogDescription>
+          Are you sure you want to delete this property? This action cannot be undone.
+        </AlertDialogDescription>
+      </AlertDialogHeader>
+      <AlertDialogFooter>
+        <AlertDialogCancel data-testid="button-cancel-delete">Cancel</AlertDialogCancel>
+        <AlertDialogAction
+          onClick={() => deleteId && deleteMutation.mutate(deleteId)}
+          className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+          data-testid="button-confirm-delete"
+        >
+          {deleteMutation.isPending ? "Deleting..." : "Delete"}
+        </AlertDialogAction>
+      </AlertDialogFooter>
+    </AlertDialogContent>
+  </AlertDialog>
+    </div >
   );
 }

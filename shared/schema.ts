@@ -105,15 +105,31 @@ export const payments = pgTable("payments", {
   paidAmount: real("paid_amount").notNull().default(0),
   dueDate: text("due_date").notNull(),
   paidDate: text("paid_date"),
-  status: text("status").notNull().default("pending"), // paid, pending, overdue
-  method: text("method"), // bank_transfer, check, cash, m_pesa, online
-  reference: text("reference"), // logic: transaction code for m-pesa/bank
+  status: text("status").notNull().default("pending"), // paid, pending, overdue, partial
+  method: text("method"), // method of last payment
+  reference: text("reference"), // reference of last payment
   notes: text("notes"),
 });
 
 export const insertPaymentSchema = createInsertSchema(payments).omit({ id: true, userId: true });
 export type InsertPayment = z.infer<typeof insertPaymentSchema>;
 export type Payment = typeof payments.$inferSelect;
+
+// Payment History Schema - tracks individual transactions
+export const paymentHistory = pgTable("payment_history", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  paymentId: varchar("payment_id").notNull().references(() => payments.id, { onDelete: "cascade" }),
+  amount: real("amount").notNull(),
+  date: text("date").notNull(),
+  method: text("method"),
+  reference: text("reference"),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export const insertPaymentHistorySchema = createInsertSchema(paymentHistory).omit({ id: true, createdAt: true });
+export type InsertPaymentHistory = z.infer<typeof insertPaymentHistorySchema>;
+export type PaymentHistory = typeof paymentHistory.$inferSelect;
 
 // Maintenance Request Schema - with userId for multi-user support
 export const maintenanceRequests = pgTable("maintenance_requests", {

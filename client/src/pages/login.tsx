@@ -25,7 +25,13 @@ export default function Login() {
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState("");
     const { toast } = useToast();
-    const { login } = useAuth();
+    const { login, user } = useAuth();
+
+    // Redirect if already logged in
+    if (user) {
+        setLocation("/");
+        return null;
+    }
 
     const { register, handleSubmit, formState: { errors }, setValue } = useForm<LoginForm>({
         resolver: zodResolver(loginSchema),
