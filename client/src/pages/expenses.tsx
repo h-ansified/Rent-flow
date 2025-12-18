@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -38,14 +39,39 @@ import {
     Zap,
     Repeat,
     FileText,
+    Loader2,
+    ZapIcon,
+    Droplets,
+    Wrench,
+    Shield,
+    Receipt,
+    LayoutGrid,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import type { Expense, Property } from "@shared/schema";
 import { useAuth } from "@/hooks/use-auth";
 import { formatCurrency } from "@/lib/currency-utils";
+import { generateExpenseReportPDF } from "@/lib/pdf-generators";
 
 type ExpenseWithProperty = Expense & { propertyName?: string };
+
+interface CategoryStats {
+    totalAmount: number;
+    paidAmount: number;
+    pendingCount: number;
+    overdueCount: number;
+    count: number;
+}
+
+const categoryIcons: Record<string, any> = {
+    electricity: ZapIcon,
+    water: Droplets,
+    maintenance: Wrench,
+    insurance: Shield,
+    tax: Receipt,
+    other: LayoutGrid,
+};
 
 function ExpenseStatusBadge({ status }: { status: string }) {
     const statusConfig = {
@@ -82,6 +108,69 @@ function CategoryBadge({ category }: { category: string }) {
     );
 }
 
+function CategoryCard({
+    category,
+    stats,
+    isSelected,
+    onClick
+}: {
+    category: string;
+    stats: CategoryStats;
+    isSelected: boolean;
+    onClick: () => void;
+}) {
+    const { user } = useAuth();
+    const Icon = categoryIcons[category] || LayoutGrid;
+    const balance = stats.totalAmount - stats.paidAmount;
+
+    return (
+        <Card
+            className={`cursor-pointer transition-all hover:shadow-lg ${isSelected ? 'ring-2 ring-primary' : ''}`}
+            onClick={onClick}
+        >
+            <CardHeader className="pb-3">
+                <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                        <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center">
+                            <Icon className="h-5 w-5 text-primary" />
+                        </div>
+                        <div>
+                            <CardTitle className="text-sm font-medium capitalize">{category}</CardTitle>
+                            <p className="text-xs text-muted-foreground">{stats.count} expenses</p>
+                        </div>
+                    </div>
+                </div>
+            </CardHeader>
+            <CardContent className="space-y-2">
+                <div className="flex justify-between items-baseline">
+                    <span className="text-xs text-muted-foreground">Total</span>
+                    <span className="text-lg font-bold">{formatCurrency(stats.totalAmount, user?.currency ?? undefined)}</span>
+                </div>
+                <div className="flex justify-between items-baseline">
+                    <span className="text-xs text-muted-foreground">Paid</span>
+                    <span className="text-sm font-medium text-green-600">{formatCurrency(stats.paidAmount, user?.currency ?? undefined)}</span>
+                </div>
+                <div className="flex justify-between items-baseline border-t pt-2">
+                    <span className="text-xs font-medium">Balance</span>
+                    <span className="text-base font-bold text-red-600">{formatCurrency(balance, user?.currency ?? undefined)}</span>
+                </div>
+                <div className="flex gap-2 pt-1">
+                    {stats.pendingCount > 0 && (
+                        <Badge variant="secondary" className="text-xs">
+                            {stats.pendingCount} pending
+                        </Badge>
+                    )}
+                    {stats.overdueCount > 0 && (
+                        <Badge variant="destructive" className="text-xs">
+                            {stats.overdueCount} overdue
+                        </Badge>
+                    )}
+                </div>
+            </CardContent>
+        </Card>
+    );
+}
+
 export default function Expenses() {
     const [searchQuery, setSearchQuery] = useState("");
     const [statusFilter, setStatusFilter] = useState<string>("all");
@@ -93,7 +182,7 @@ export default function Expenses() {
     const [selectedExpense, setSelectedExpense] = useState<ExpenseWithProperty | null>(null);
     const [viewingExpense, setViewingExpense] = useState<ExpenseWithProperty | null>(null);
 
-    // Form state for new/edit expense
+    // Form state
     const [title, setTitle] = useState("");
     const [category, setCategory] = useState("electricity");
     const [amount, setAmount] = useState("");
@@ -110,13 +199,33 @@ export default function Expenses() {
     const [reference, setReference] = useState("");
     const [paymentNotes, setPaymentNotes] = useState("");
 
-    const { data: expenses, isLoading } = useQuery<ExpenseWithProperty[]>({
+    const { data: expenses, isLoading, error } = useQuery<ExpenseWithProperty[]>({
         queryKey: ["/api/expenses"],
+        retry: 1,
     });
 
     const { data: properties } = useQuery<Property[]>({
         queryKey: ["/api/properties"],
     });
+
+    // Handle error state
+    if (error) {
+        return (
+            <div className="p-6">
+                <Alert variant="destructive">
+                    <AlertCircle className="h-4 w-4" />
+                    <AlertTitle>Database Error</AlertTitle>
+                    <AlertDescription>
+                        Failed to load expenses. This usually means the expenses table hasn't been created yet.
+                        <br /><br />
+                        <strong>To fix this:</strong> Run <code className="bg-muted px-2 py-1 rounded">npm run db:push</code> in your terminal.
+                        <br /><br />
+                        If PowerShell gives an error, first run: <code className="bg-muted px-2 py-1 rounded">Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser</code>
+                    </AlertDescription>
+                </Alert>
+            </div>
+        );
+    }
 
     const createExpenseMutation = useMutation({
         mutationFn: async (data: any) => {
@@ -128,14 +237,15 @@ export default function Expenses() {
             resetForm();
             setIsNewDialogOpen(false);
             toast({
-                title: "Expense created",
-                description: "The expense has been added successfully.",
+                title: "Success",
+                description: "Expense created successfully.",
             });
         },
-        onError: () => {
+        onError: (error: any) => {
+            console.error("Expense creation error:", error);
             toast({
                 title: "Error",
-                description: "Failed to create expense.",
+                description: error?.message || "Failed to create expense. Please try again.",
                 variant: "destructive",
             });
         },
@@ -158,14 +268,15 @@ export default function Expenses() {
             setReference("");
             setPaymentNotes("");
             toast({
-                title: "Payment recorded",
-                description: "The expense payment has been recorded.",
+                title: "Success",
+                description: "Payment recorded successfully.",
             });
         },
-        onError: () => {
+        onError: (error: any) => {
+            console.error("Payment recording error:", error);
             toast({
                 title: "Error",
-                description: "Failed to record payment.",
+                description: error?.message || "Failed to record payment. Please try again.",
                 variant: "destructive",
             });
         },
@@ -184,6 +295,15 @@ export default function Expenses() {
     };
 
     const handleCreateExpense = () => {
+        if (!title || !amount || !dueDate) {
+            toast({
+                title: "Validation Error",
+                description: "Please fill in all required fields.",
+                variant: "destructive",
+            });
+            return;
+        }
+
         createExpenseMutation.mutate({
             title,
             category,
@@ -197,6 +317,51 @@ export default function Expenses() {
             status: "pending",
         });
     };
+
+    const handleGenerateReport = () => {
+        if (!user || !expenses || expenses.length === 0) {
+            toast({
+                title: "No Data",
+                description: "No expenses to generate report from.",
+                variant: "destructive",
+            });
+            return;
+        }
+
+        try {
+            generateExpenseReportPDF(user, expenses);
+            toast({
+                title: "Success",
+                description: "Expense report PDF downloaded successfully.",
+            });
+        } catch (error) {
+            console.error("PDF generation error:", error);
+            toast({
+                title: "Error",
+                description: "Failed to generate PDF. Please try again.",
+                variant: "destructive",
+            });
+        }
+    };
+
+    // Calculate category stats
+    const categoryStats = expenses?.reduce((acc, expense) => {
+        if (!acc[expense.category]) {
+            acc[expense.category] = {
+                totalAmount: 0,
+                paidAmount: 0,
+                pendingCount: 0,
+                overdueCount: 0,
+                count: 0,
+            };
+        }
+        acc[expense.category].totalAmount += expense.amount;
+        acc[expense.category].paidAmount += expense.paidAmount;
+        if (expense.status === 'pending') acc[expense.category].pendingCount++;
+        if (expense.status === 'overdue') acc[expense.category].overdueCount++;
+        acc[expense.category].count++;
+        return acc;
+    }, {} as Record<string, CategoryStats>) || {};
 
     const filteredExpenses = expenses?.filter((expense) => {
         const matchesSearch = expense.title.toLowerCase().includes(searchQuery.toLowerCase());
@@ -219,7 +384,7 @@ export default function Expenses() {
                     <p className="text-muted-foreground mt-1">Track and manage recurring and one-time expenses</p>
                 </div>
                 <div className="flex items-center gap-2">
-                    <Button variant="outline" size="sm" onClick={() => toast({ title: "Coming soon", description: "Expense report download will be available soon." })}>
+                    <Button variant="outline" size="sm" onClick={handleGenerateReport}>
                         <FileText className="h-4 w-4 mr-2" />
                         Generate Report
                     </Button>
@@ -285,6 +450,35 @@ export default function Expenses() {
                 </Card>
             </div>
 
+            {/* Category Tiles */}
+            {Object.keys(categoryStats).length > 0 && (
+                <div className="space-y-4">
+                    <div className="flex items-center justify-between">
+                        <h2 className="text-lg font-semibold">Expenses by Category</h2>
+                        {categoryFilter !== "all" && (
+                            <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => setCategoryFilter("all")}
+                            >
+                                Clear Filter
+                            </Button>
+                        )}
+                    </div>
+                    <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                        {Object.entries(categoryStats).map(([cat, stats]) => (
+                            <CategoryCard
+                                key={cat}
+                                category={cat}
+                                stats={stats}
+                                isSelected={categoryFilter === cat}
+                                onClick={() => setCategoryFilter(categoryFilter === cat ? "all" : cat)}
+                            />
+                        ))}
+                    </div>
+                </div>
+            )}
+
             {/* Filters */}
             <div className="flex flex-col sm:flex-row gap-4">
                 <div className="relative flex-1">
@@ -296,20 +490,6 @@ export default function Expenses() {
                         className="pl-10"
                     />
                 </div>
-                <Select value={categoryFilter} onValueChange={setCategoryFilter}>
-                    <SelectTrigger className="w-full sm:w-[180px]">
-                        <SelectValue placeholder="Filter by category" />
-                    </SelectTrigger>
-                    <SelectContent>
-                        <SelectItem value="all">All Categories</SelectItem>
-                        <SelectItem value="electricity">Electricity</SelectItem>
-                        <SelectItem value="water">Water</SelectItem>
-                        <SelectItem value="maintenance">Maintenance</SelectItem>
-                        <SelectItem value="insurance">Insurance</SelectItem>
-                        <SelectItem value="tax">Tax</SelectItem>
-                        <SelectItem value="other">Other</SelectItem>
-                    </SelectContent>
-                </Select>
                 <Select value={statusFilter} onValueChange={setStatusFilter}>
                     <SelectTrigger className="w-full sm:w-[180px]">
                         <SelectValue placeholder="Filter by status" />
@@ -324,6 +504,16 @@ export default function Expenses() {
             </div>
 
             {/* Expenses Table */}
+            {categoryFilter !== "all" && (
+                <Alert>
+                    <LayoutGrid className="h-4 w-4" />
+                    <AlertTitle>Filtered by Category</AlertTitle>
+                    <AlertDescription>
+                        Showing only <strong className="capitalize">{categoryFilter}</strong> expenses. Click the category tile again or use the "Clear Filter" button to show all.
+                    </AlertDescription>
+                </Alert>
+            )}
+
             <Card>
                 <CardContent className="p-0">
                     <Table>
@@ -414,14 +604,14 @@ export default function Expenses() {
 
             {/* Create Expense Dialog */}
             <Dialog open={isNewDialogOpen} onOpenChange={setIsNewDialogOpen}>
-                <DialogContent className="max-w-2xl">
+                <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
                     <DialogHeader>
                         <DialogTitle>Add New Expense</DialogTitle>
                     </DialogHeader>
                     <div className="grid gap-4">
                         <div className="grid grid-cols-2 gap-4">
                             <div className="space-y-2 col-span-2">
-                                <Label htmlFor="title">Title</Label>
+                                <Label htmlFor="title">Title *</Label>
                                 <Input
                                     id="title"
                                     placeholder="e.g., KPLC - Main Building"
@@ -430,7 +620,7 @@ export default function Expenses() {
                                 />
                             </div>
                             <div className="space-y-2">
-                                <Label htmlFor="category">Category</Label>
+                                <Label htmlFor="category">Category *</Label>
                                 <Select value={category} onValueChange={setCategory}>
                                     <SelectTrigger id="category">
                                         <SelectValue />
@@ -460,7 +650,7 @@ export default function Expenses() {
                                 </Select>
                             </div>
                             <div className="space-y-2">
-                                <Label htmlFor="amount">Amount ({user?.currency || "KES"})</Label>
+                                <Label htmlFor="amount">Amount ({user?.currency || "KES"}) *</Label>
                                 <Input
                                     id="amount"
                                     type="number"
@@ -470,7 +660,7 @@ export default function Expenses() {
                                 />
                             </div>
                             <div className="space-y-2">
-                                <Label htmlFor="dueDate">Due Date</Label>
+                                <Label htmlFor="dueDate">Due Date *</Label>
                                 <Input
                                     id="dueDate"
                                     type="date"
@@ -526,8 +716,9 @@ export default function Expenses() {
                             </div>
                         </div>
                         <div className="flex justify-end gap-3">
-                            <Button variant="outline" onClick={() => setIsNewDialogOpen(false)}>Cancel</Button>
-                            <Button onClick={handleCreateExpense} disabled={createExpenseMutation.isPending || !title || !amount || !dueDate}>
+                            <Button variant="outline" onClick={() => { setIsNewDialogOpen(false); resetForm(); }}>Cancel</Button>
+                            <Button onClick={handleCreateExpense} disabled={createExpenseMutation.isPending}>
+                                {createExpenseMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                                 {createExpenseMutation.isPending ? "Creating..." : "Create Expense"}
                             </Button>
                         </div>
@@ -559,7 +750,7 @@ export default function Expenses() {
                             </div>
 
                             <div className="space-y-2">
-                                <Label>Payment Amount ({user?.currency || "KES"})</Label>
+                                <Label>Payment Amount ({user?.currency || "KES"}) *</Label>
                                 <Input
                                     type="number"
                                     placeholder="Enter amount paid..."
@@ -608,6 +799,7 @@ export default function Expenses() {
                                     onClick={() => recordPaymentMutation.mutate(selectedExpense.id)}
                                     disabled={recordPaymentMutation.isPending || !paidAmount}
                                 >
+                                    {recordPaymentMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                                     {recordPaymentMutation.isPending ? "Processing..." : "Confirm Payment"}
                                 </Button>
                             </div>
