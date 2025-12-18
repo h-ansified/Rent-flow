@@ -38,15 +38,17 @@ import {
   Plus,
   Eye,
   Mail,
+  FileText,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { Textarea } from "@/components/ui/textarea";
-import type { Payment, Tenant, Property } from "@shared/schema";
+import type { Payment, Tenant, Property, Expense } from "@shared/schema";
 import { useAuth } from "@/hooks/use-auth";
 import { formatCurrency, getCurrencySymbol } from "@/lib/currency-utils";
 import { InvoiceTemplate } from "@/components/invoice-template";
 import { createPortal } from "react-dom";
+import { generatePropertyReportPDF } from "@/lib/pdf-generators";
 
 type PaymentWithDetails = Payment & { tenantName: string; propertyName: string };
 
@@ -154,6 +156,39 @@ export default function Payments() {
     }, 100);
   };
 
+  const handleGenerateReport = () => {
+    if (!user || !payments || payments.length === 0) {
+      toast({
+        title: "No Data",
+        description: "No payments to generate report from.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      // For now, generate a simple payments report
+      // In the future, this could be expanded to include property selection
+      generatePropertyReportPDF(
+        user,
+        { name: "All Properties", address: "", city: "", state: "", zipCode: "" } as any,
+        payments,
+        [] // Empty expenses array for now
+      );
+      toast({
+        title: "Success",
+        description: "Payment report PDF downloaded successfully.",
+      });
+    } catch (error) {
+      console.error("PDF generation error:", error);
+      toast({
+        title: "Error",
+        description: "Failed to generate PDF. Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
+
   const [isNewDialogOpen, setIsNewDialogOpen] = useState(false);
   const [newPaymentTenantId, setNewPaymentTenantId] = useState<string>("");
   const [newPaymentAmount, setNewPaymentAmount] = useState<string>("");
@@ -252,9 +287,9 @@ export default function Payments() {
           <p className="text-muted-foreground mt-1">Track and manage rent payments</p>
         </div>
         <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm" onClick={() => toast({ title: "Feature coming soon", description: "Reports will be available soon." })}>
-            <Eye className="h-4 w-4 mr-2" />
-            Property Report
+          <Button variant="outline" size="sm" onClick={handleGenerateReport}>
+            <FileText className="h-4 w-4 mr-2" />
+            Generate Report
           </Button>
           <Button onClick={() => setIsNewDialogOpen(true)} data-testid="button-new-payment">
             <Plus className="h-4 w-4 mr-2" />
