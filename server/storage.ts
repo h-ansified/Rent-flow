@@ -252,21 +252,21 @@ class DatabaseStorage {
 
   async updatePayment(
     id: string,
-    updates: Partial<Payment> & { paidAmount?: number },
+    updates: Partial<Payment>,
     userId: string
   ): Promise<Payment | undefined> {
-    // If we are recording a payment, we increment the paidAmount
     const current = await this.getPayment(id, userId);
     if (!current) return undefined;
 
-    const newPaidAmount = (current.paidAmount || 0) + (updates.paidAmount || 0);
-    const isCleared = newPaidAmount >= current.amount;
+    // Use the provided paidAmount or fallback to current
+    const finalPaidAmount = updates.paidAmount !== undefined ? updates.paidAmount : (current.paidAmount || 0);
+    const isCleared = finalPaidAmount >= current.amount;
 
     const finalUpdates: any = {
       ...updates,
-      paidAmount: newPaidAmount,
+      paidAmount: finalPaidAmount,
       status: isCleared ? "paid" : (current.dueDate < new Date().toISOString().split("T")[0] ? "overdue" : "pending"),
-      paidDate: isCleared ? (updates.paidDate || new Date().toISOString().split("T")[0]) : current.paidDate
+      paidDate: isCleared ? (updates.paidDate || new Date().toISOString().split("T")[0]) : (updates.paidDate || current.paidDate)
     };
 
     const [payment] = await db
@@ -508,7 +508,7 @@ class DatabaseStorage {
       })
       .from(payments)
       .leftJoin(tenants, eq(payments.tenantId, tenants.id))
-      .where(and(eq(payments.userId, userId), sql`${payments.paidDate} IS NOT NULL`))
+      .where(and(eq(payments.userId, userId), sql`${payments.paidAmount} > 0`))
       .orderBy(desc(payments.paidDate))
       .limit(5);
 
@@ -552,29 +552,29 @@ class DatabaseStorage {
 
     const activities: Activity[] = [
       ...recentPayments.map((p) => ({
-        id: p.id,
+        id: `pay-${p.id}`,
         type: "payment" as const,
         description: `Payment received: ${p.tenantFirstName} ${p.tenantLastName || ''} paid ${p.amount}`,
-        timestamp: p.paidDate || "",
+        timestamp: p.paidDate || new Date().toISOString(),
         propertyId: p.propertyId,
         tenantId: p.tenantId,
       })),
       ...recentMaintenance.map((m) => ({
-        id: m.id,
+        id: `maint-${m.id}`,
         type: "maintenance" as const,
         description: `Maintenance Request: ${m.title}`,
         timestamp: m.createdAt,
         propertyId: m.propertyId,
       })),
       ...recentExpenses.map((e) => ({
-        id: e.id,
+        id: `exp-${e.id}`,
         type: "maintenance" as const, // Categorize expenses under maintenance for icon consistency
         description: `Expense Recorded: ${e.title} (${e.amount})`,
         timestamp: e.createdAt.toISOString(),
         propertyId: e.propertyId || undefined,
       })),
       ...newTenants.map((t) => ({
-        id: t.id,
+        id: `ten-${t.id}`,
         type: "tenant" as const,
         description: `New Tenant: ${t.firstName} ${t.lastName}`,
         timestamp: t.leaseStart,
@@ -704,21 +704,21 @@ class DatabaseStorage {
 
   async updateExpense(
     id: string,
-    updates: Partial<Expense> & { paidAmount?: number },
+    updates: Partial<Expense>,
     userId: string
   ): Promise<Expense | undefined> {
-    // Similar to payment logic - increment paidAmount
     const current = await this.getExpense(id, userId);
     if (!current) return undefined;
 
-    const newPaidAmount = (current.paidAmount || 0) + (updates.paidAmount || 0);
-    const isCleared = newPaidAmount >= current.amount;
+    // Use the provided paidAmount or fallback to current
+    const finalPaidAmount = updates.paidAmount !== undefined ? updates.paidAmount : (current.paidAmount || 0);
+    const isCleared = finalPaidAmount >= current.amount;
 
     const finalUpdates: any = {
       ...updates,
-      paidAmount: newPaidAmount,
+      paidAmount: finalPaidAmount,
       status: isCleared ? "paid" : (current.dueDate < new Date().toISOString().split("T")[0] ? "overdue" : "pending"),
-      paidDate: isCleared ? (updates.paidDate || new Date().toISOString().split("T")[0]) : current.paidDate
+      paidDate: isCleared ? (updates.paidDate || new Date().toISOString().split("T")[0]) : (updates.paidDate || current.paidDate)
     };
 
     const [expense] = await db

@@ -660,7 +660,7 @@ export default function Payments() {
 
       {/* View Payment Details Dialog */}
       <Dialog open={!!viewingPayment} onOpenChange={() => setViewingPayment(null)}>
-        <DialogContent className="max-w-md">
+        <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Payment Details</DialogTitle>
           </DialogHeader>

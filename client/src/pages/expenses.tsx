@@ -253,11 +253,15 @@ export default function Expenses() {
 
     const recordPaymentMutation = useMutation({
         mutationFn: async (expenseId: string) => {
+            const amountToRecord = parseFloat(paidAmount);
+            if (isNaN(amountToRecord)) throw new Error("Invalid payment amount");
+
             return apiRequest("PATCH", `/api/expenses/${expenseId}`, {
-                paidAmount: parseFloat(paidAmount),
+                paidAmount: (selectedExpense?.paidAmount || 0) + amountToRecord,
                 paymentMethod,
                 reference,
                 notes: paymentNotes,
+                paidDate: new Date().toISOString().split("T")[0], // Explicitly set paid date
             });
         },
         onSuccess: () => {
@@ -304,10 +308,20 @@ export default function Expenses() {
             return;
         }
 
+        const amountValue = parseFloat(amount);
+        if (isNaN(amountValue) || amountValue <= 0) {
+            toast({
+                title: "Validation Error",
+                description: "Please enter a valid expense amount.",
+                variant: "destructive",
+            });
+            return;
+        }
+
         createExpenseMutation.mutate({
             title,
             category,
-            amount: parseFloat(amount),
+            amount: amountValue,
             dueDate,
             expiryDate: expiryDate || null,
             isRecurring,
@@ -728,7 +742,7 @@ export default function Expenses() {
 
             {/* Record Payment Dialog */}
             <Dialog open={!!selectedExpense} onOpenChange={() => setSelectedExpense(null)}>
-                <DialogContent>
+                <DialogContent className="max-h-[90vh] overflow-y-auto">
                     <DialogHeader>
                         <DialogTitle>Record Payment</DialogTitle>
                     </DialogHeader>
