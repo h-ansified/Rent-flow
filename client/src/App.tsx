@@ -13,6 +13,7 @@ import Properties from "@/pages/properties";
 import Tenants from "@/pages/tenants";
 import Payments from "@/pages/payments";
 import Maintenance from "@/pages/maintenance";
+import Expenses from "@/pages/expenses";
 import Settings from "@/pages/settings";
 import Help from "@/pages/help";
 import Login from "@/pages/login";
@@ -28,6 +29,7 @@ function ProtectedRouter() {
       <Route path="/tenants" component={Tenants} />
       <Route path="/payments" component={Payments} />
       <Route path="/maintenance" component={Maintenance} />
+      <Route path="/expenses" component={Expenses} />
       <Route path="/settings" component={Settings} />
       <Route path="/help" component={Help} />
       <Route component={NotFound} />

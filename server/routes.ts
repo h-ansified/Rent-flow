@@ -2,7 +2,7 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import rateLimit from "express-rate-limit";
 import { storage } from "./storage";
-import { insertPropertySchema, insertTenantSchema, insertPaymentSchema, insertMaintenanceRequestSchema } from "@shared/schema";
+import { insertPropertySchema, insertTenantSchema, insertPaymentSchema, insertMaintenanceRequestSchema, insertExpenseSchema } from "@shared/schema";
 import { authRouter, requireAuth } from "./auth";
 
 // Rate limiting for auth endpoints (prevent brute force)
@@ -331,6 +331,85 @@ export async function registerRoutes(
       res.status(204).send();
     } catch (error) {
       res.status(500).json({ error: "Failed to delete maintenance request" });
+    }
+  });
+
+  // Expense routes (protected)
+  app.get("/api/expenses", requireAuth, async (req, res) => {
+    try {
+      const userId = req.session.userId!;
+      const expenses = await storage.getAllExpenses(userId);
+      res.json(expenses);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch expenses" });
+    }
+  });
+
+  app.get("/api/expenses/:id", requireAuth, async (req, res) => {
+    try {
+      const userId = req.session.userId!;
+      const expense = await storage.getExpense(req.params.id, userId);
+      if (!expense) {
+        return res.status(404).json({ error: "Expense not found" });
+      }
+      res.json(expense);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch expense" });
+    }
+  });
+
+  app.post("/api/expenses", requireAuth, async (req, res) => {
+    try {
+      const userId = req.session.userId!;
+      const parsed = insertExpenseSchema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ error: "Invalid expense data", details: parsed.error.errors });
+      }
+      const expense = await storage.createExpense(parsed.data, userId);
+      res.status(201).json(expense);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to create expense" });
+    }
+  });
+
+  app.patch("/api/expenses/:id", requireAuth, async (req, res) => {
+    try {
+      const userId = req.session.userId!;
+      const expense = await storage.updateExpense(req.params.id, req.body, userId);
+      if (!expense) {
+        return res.status(404).json({ error: "Expense not found" });
+      }
+      res.json(expense);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to update expense" });
+    }
+  });
+
+  app.delete("/api/expenses/:id", requireAuth, async (req, res) => {
+    try {
+      const userId = req.session.userId!;
+      const deleted = await storage.deleteExpense(req.params.id, userId);
+      if (!deleted) {
+        return res.status(404).json({ error: "Expense not found" });
+      }
+      res.status(204).send();
+    } catch (error) {
+      res.status(500).json({ error: "Failed to delete expense" });
+    }
+  });
+
+  app.get("/api/expenses/report", requireAuth, async (req, res) => {
+    try {
+      const userId = req.session.userId!;
+      const { startDate, endDate } = req.query;
+      const report = await storage.getExpenseReport(
+        userId,
+        startDate as string | undefined,
+        endDate as string | undefined
+      );
+      res.json(report);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to generate expense report" });
     }
   });
 

@@ -95,7 +95,7 @@ export default function Settings() {
 
       if (!res.ok) throw new Error("Failed to update profile");
 
-      await queryClient.invalidateQueries({ queryKey: ["/api/auth/me"] });
+      await queryClient.invalidateQueries({ queryKey: ["auth"] });
       toast({ title: "Success", description: "Profile updated successfully" });
     } catch (error) {
       toast({ title: "Error", description: "Failed to update profile", variant: "destructive" });

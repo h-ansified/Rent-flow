@@ -18,6 +18,7 @@ import {
   Users,
   CreditCard,
   Wrench,
+  Wallet,
   Settings,
   HelpCircle,
   LogOut,
@@ -50,6 +51,11 @@ const mainNavItems = [
     title: "Maintenance",
     url: "/maintenance",
     icon: Wrench,
+  },
+  {
+    title: "Expenses",
+    url: "/expenses",
+    icon: Wallet,
   },
 ];
 

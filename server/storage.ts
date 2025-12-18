@@ -1,11 +1,12 @@
 import { db } from "./db";
 import {
-  users, properties, tenants, payments, maintenanceRequests,
+  users, properties, tenants, payments, maintenanceRequests, expenses,
   type User, type InsertUser,
   type Property, type InsertProperty,
   type Tenant, type InsertTenant,
   type Payment, type InsertPayment,
   type MaintenanceRequest, type InsertMaintenanceRequest,
+  type Expense, type InsertExpense,
   type DashboardMetrics, type RevenueData, type Activity
 } from "@shared/schema";
 import { eq, and, desc, sql } from "drizzle-orm";
@@ -404,7 +405,8 @@ class DatabaseStorage {
   }
 
   async getRevenueData(userId: string): Promise<RevenueData[]> {
-    const monthlyData: Record<string, number> = {};
+    const monthlyRevenue: Record<string, number> = {};
+    const monthlyExpenses: Record<string, number> = {};
     const months: string[] = [];
 
     // Initialize last 6 months based on current server time
@@ -413,10 +415,11 @@ class DatabaseStorage {
       const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
       const monthName = d.toLocaleString('default', { month: 'short' });
       months.push(monthName);
-      monthlyData[monthName] = 0;
+      monthlyRevenue[monthName] = 0;
+      monthlyExpenses[monthName] = 0;
     }
 
-    // Fetch all payments with any collections
+    // Fetch all payments with collections (actual revenue)
     const collections = await db
       .select({
         paidAmount: payments.paidAmount,
@@ -429,22 +432,47 @@ class DatabaseStorage {
         sql`${payments.paidAmount} > 0`
       ));
 
+    // Fetch all expenses with payments (actual expenses)
+    const expensePayments = await db
+      .select({
+        paidAmount: expenses.paidAmount,
+        paidDate: expenses.paidDate,
+        dueDate: expenses.dueDate, // Fallback
+      })
+      .from(expenses)
+      .where(and(
+        eq(expenses.userId, userId),
+        sql`${expenses.paidAmount} > 0`
+      ));
+
     // Aggregate revenue by month
     collections.forEach(p => {
       const dateStr = p.paidDate || p.dueDate;
       if (dateStr) {
         const date = new Date(dateStr);
         const monthName = date.toLocaleString('default', { month: 'short' });
-        if (monthlyData[monthName] !== undefined) {
-          monthlyData[monthName] += p.paidAmount;
+        if (monthlyRevenue[monthName] !== undefined) {
+          monthlyRevenue[monthName] += p.paidAmount;
+        }
+      }
+    });
+
+    // Aggregate expenses by month
+    expensePayments.forEach(e => {
+      const dateStr = e.paidDate || e.dueDate;
+      if (dateStr) {
+        const date = new Date(dateStr);
+        const monthName = date.toLocaleString('default', { month: 'short' });
+        if (monthlyExpenses[monthName] !== undefined) {
+          monthlyExpenses[monthName] += e.paidAmount;
         }
       }
     });
 
     return months.map(month => ({
       month,
-      revenue: monthlyData[month],
-      expenses: monthlyData[month] * 0.1, // Estimated 10% expenses for now
+      revenue: monthlyRevenue[month],
+      expenses: monthlyExpenses[month],
     }));
   }
 
@@ -558,6 +586,112 @@ class DatabaseStorage {
       ...row.tenant,
       propertyName: row.propertyName || "Unknown Property",
     }));
+  }
+
+  // ===================
+  // EXPENSE METHODS
+  // ===================
+
+  private async updateOverdueExpenses(userId: string): Promise<void> {
+    const now = new Date().toISOString().split("T")[0];
+    await db
+      .update(expenses)
+      .set({ status: "overdue" })
+      .where(
+        and(
+          eq(expenses.userId, userId),
+          eq(expenses.status, "pending"),
+          sql`${expenses.dueDate} < ${now}`,
+          sql`${expenses.amount} > ${expenses.paidAmount}`
+        )
+      );
+  }
+
+  async getAllExpenses(userId: string): Promise<(Expense & { propertyName?: string })[]> {
+    await this.updateOverdueExpenses(userId);
+    const result = await db
+      .select({
+        expense: expenses,
+        propertyName: properties.name,
+      })
+      .from(expenses)
+      .leftJoin(properties, eq(expenses.propertyId, properties.id))
+      .where(eq(expenses.userId, userId))
+      .orderBy(desc(expenses.dueDate));
+
+    return result.map((row) => ({
+      ...row.expense,
+      propertyName: row.propertyName || undefined,
+    }));
+  }
+
+  async getExpense(id: string, userId: string): Promise<Expense | undefined> {
+    const [expense] = await db
+      .select()
+      .from(expenses)
+      .where(and(eq(expenses.id, id), eq(expenses.userId, userId)))
+      .limit(1);
+    return expense;
+  }
+
+  async createExpense(insertExpense: InsertExpense, userId: string): Promise<Expense> {
+    const [expense] = await db
+      .insert(expenses)
+      .values({ ...insertExpense, userId })
+      .returning();
+    return expense;
+  }
+
+  async updateExpense(
+    id: string,
+    updates: Partial<Expense> & { paidAmount?: number },
+    userId: string
+  ): Promise<Expense | undefined> {
+    // Similar to payment logic - increment paidAmount
+    const current = await this.getExpense(id, userId);
+    if (!current) return undefined;
+
+    const newPaidAmount = (current.paidAmount || 0) + (updates.paidAmount || 0);
+    const isCleared = newPaidAmount >= current.amount;
+
+    const finalUpdates: any = {
+      ...updates,
+      paidAmount: newPaidAmount,
+      status: isCleared ? "paid" : (current.dueDate < new Date().toISOString().split("T")[0] ? "overdue" : "pending"),
+      paidDate: isCleared ? (updates.paidDate || new Date().toISOString().split("T")[0]) : current.paidDate
+    };
+
+    const [expense] = await db
+      .update(expenses)
+      .set(finalUpdates)
+      .where(and(eq(expenses.id, id), eq(expenses.userId, userId)))
+      .returning();
+    return expense;
+  }
+
+  async deleteExpense(id: string, userId: string): Promise<boolean> {
+    const result = await db
+      .delete(expenses)
+      .where(and(eq(expenses.id, id), eq(expenses.userId, userId)))
+      .returning({ id: expenses.id });
+    return result.length > 0;
+  }
+
+  async getExpenseReport(userId: string, startDate?: string, endDate?: string): Promise<Expense[]> {
+    const conditions = [eq(expenses.userId, userId)];
+
+    if (startDate) {
+      conditions.push(sql`${expenses.dueDate} >= ${startDate}`);
+    }
+    if (endDate) {
+      conditions.push(sql`${expenses.dueDate} <= ${endDate}`);
+    }
+
+    return await db
+      .select()
+      .from(expenses)
+      .where(and(...conditions))
+      .orderBy(desc(expenses.dueDate));
   }
 }
 

@@ -136,6 +136,31 @@ export const insertMaintenanceRequestSchema = createInsertSchema(maintenanceRequ
 export type InsertMaintenanceRequest = z.infer<typeof insertMaintenanceRequestSchema>;
 export type MaintenanceRequest = typeof maintenanceRequests.$inferSelect;
 
+// Expense Schema - for tracking recurring/one-time expenses (KPLC, water, etc.)
+export const expenses = pgTable("expenses", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  propertyId: varchar("property_id"), // Optional - expense may be general or property-specific
+  title: text("title").notNull(), // e.g., "KPLC - Main Building"
+  category: text("category").notNull(), // electricity, water, maintenance, insurance, tax, other
+  amount: real("amount").notNull(), // Total amount due
+  paidAmount: real("paid_amount").notNull().default(0), // Amount paid so far
+  isRecurring: boolean("is_recurring").notNull().default(false),
+  frequency: text("frequency"), // monthly, quarterly, annually
+  dueDate: text("due_date").notNull(),
+  paidDate: text("paid_date"), // Last payment date
+  expiryDate: text("expiry_date"), // For bills with expiry/cutoff date
+  status: text("status").notNull().default("pending"), // paid, pending, overdue
+  paymentMethod: text("payment_method"), // m_pesa, bank_transfer, cash, etc.
+  reference: text("reference"), // Transaction reference
+  notes: text("notes"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export const insertExpenseSchema = createInsertSchema(expenses).omit({ id: true, userId: true });
+export type InsertExpense = z.infer<typeof insertExpenseSchema>;
+export type Expense = typeof expenses.$inferSelect;
+
 // Dashboard metrics type
 export type DashboardMetrics = {
   totalProperties: number;
