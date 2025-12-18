@@ -473,8 +473,6 @@ export default function Payments() {
                           onClick={() => setViewingPayment(payment)}
                         >
                           View Details
-                        >
-                          View Details
                         </Button>
                         {canDeletePayment(payment.dueDate) && (
                           <Button
