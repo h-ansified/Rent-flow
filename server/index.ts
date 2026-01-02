@@ -316,7 +316,7 @@ async function startServer() {
   }
 
   // Only listen if running directly
-  if (process.argv[1] === fileURLToPath(import.meta.url)) {
+  if (require.main === module) {
     const port = parseInt(process.env.PORT || "5000", 10);
     httpServer.listen(
       {
