@@ -25,7 +25,7 @@ export default function Login() {
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState("");
     const { toast } = useToast();
-    const { login, user } = useAuth();
+    const { loginMutation, user } = useAuth();
 
     // Redirect if already logged in
     if (user) {
@@ -48,7 +48,7 @@ export default function Login() {
         setError("");
 
         try {
-            await login({
+            await loginMutation.mutateAsync({
                 email: data.email,
                 password: data.password,
             });

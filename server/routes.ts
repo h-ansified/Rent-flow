@@ -30,7 +30,7 @@ export async function registerRoutes(
   // Dashboard routes (protected)
   app.get("/api/dashboard/metrics", requireAuth, async (req, res) => {
     try {
-      const userId = req.session.userId!;
+      const userId = req.user!.id;
       const metrics = await storage.getDashboardMetrics(userId);
       res.json(metrics);
     } catch (error) {
@@ -40,7 +40,7 @@ export async function registerRoutes(
 
   app.get("/api/dashboard/revenue", requireAuth, async (req, res) => {
     try {
-      const userId = req.session.userId!;
+      const userId = req.user!.id;
       const revenue = await storage.getRevenueData(userId);
       res.json(revenue);
     } catch (error) {
@@ -50,7 +50,7 @@ export async function registerRoutes(
 
   app.get("/api/dashboard/activities", requireAuth, async (req, res) => {
     try {
-      const userId = req.session.userId!;
+      const userId = req.user!.id;
       const activities = await storage.getRecentActivities(userId);
       res.json(activities);
     } catch (error) {
@@ -60,7 +60,7 @@ export async function registerRoutes(
 
   app.get("/api/dashboard/upcoming-payments", requireAuth, async (req, res) => {
     try {
-      const userId = req.session.userId!;
+      const userId = req.user!.id;
       const payments = await storage.getUpcomingPayments(userId);
       res.json(payments);
     } catch (error) {
@@ -70,7 +70,7 @@ export async function registerRoutes(
 
   app.get("/api/dashboard/expiring-leases", requireAuth, async (req, res) => {
     try {
-      const userId = req.session.userId!;
+      const userId = req.user!.id;
       const leases = await storage.getExpiringLeases(userId);
       res.json(leases);
     } catch (error) {
@@ -81,7 +81,7 @@ export async function registerRoutes(
   // Property routes (protected)
   app.get("/api/properties", requireAuth, async (req, res) => {
     try {
-      const userId = req.session.userId!;
+      const userId = req.user!.id;
       const properties = await storage.getAllProperties(userId);
       res.json(properties);
     } catch (error) {
@@ -91,7 +91,7 @@ export async function registerRoutes(
 
   app.get("/api/properties/:id", requireAuth, async (req, res) => {
     try {
-      const userId = req.session.userId!;
+      const userId = req.user!.id;
       const property = await storage.getProperty(req.params.id, userId);
       if (!property) {
         return res.status(404).json({ error: "Property not found" });
@@ -104,7 +104,7 @@ export async function registerRoutes(
 
   app.post("/api/properties", requireAuth, async (req, res) => {
     try {
-      const userId = req.session.userId!;
+      const userId = req.user!.id;
       const parsed = insertPropertySchema.safeParse(req.body);
       if (!parsed.success) {
         return res.status(400).json({ error: "Invalid property data", details: parsed.error.errors });
@@ -118,7 +118,7 @@ export async function registerRoutes(
 
   app.patch("/api/properties/:id", requireAuth, async (req, res) => {
     try {
-      const userId = req.session.userId!;
+      const userId = req.user!.id;
       const property = await storage.updateProperty(req.params.id, req.body, userId);
       if (!property) {
         return res.status(404).json({ error: "Property not found" });
@@ -131,7 +131,7 @@ export async function registerRoutes(
 
   app.delete("/api/properties/:id", requireAuth, async (req, res) => {
     try {
-      const userId = req.session.userId!;
+      const userId = req.user!.id;
       const deleted = await storage.deleteProperty(req.params.id, userId);
       if (!deleted) {
         return res.status(404).json({ error: "Property not found" });
@@ -145,7 +145,7 @@ export async function registerRoutes(
   // Tenant routes (protected)
   app.get("/api/tenants", requireAuth, async (req, res) => {
     try {
-      const userId = req.session.userId!;
+      const userId = req.user!.id;
       const tenants = await storage.getAllTenants(userId);
       res.json(tenants);
     } catch (error) {
@@ -155,7 +155,7 @@ export async function registerRoutes(
 
   app.get("/api/tenants/:id", requireAuth, async (req, res) => {
     try {
-      const userId = req.session.userId!;
+      const userId = req.user!.id;
       const tenant = await storage.getTenant(req.params.id, userId);
       if (!tenant) {
         return res.status(404).json({ error: "Tenant not found" });
@@ -168,7 +168,7 @@ export async function registerRoutes(
 
   app.post("/api/tenants", requireAuth, async (req, res) => {
     try {
-      const userId = req.session.userId!;
+      const userId = req.user!.id;
       const parsed = insertTenantSchema.safeParse(req.body);
       if (!parsed.success) {
         return res.status(400).json({ error: "Invalid tenant data", details: parsed.error.errors });
@@ -182,7 +182,7 @@ export async function registerRoutes(
 
   app.patch("/api/tenants/:id", requireAuth, async (req, res) => {
     try {
-      const userId = req.session.userId!;
+      const userId = req.user!.id;
       const tenant = await storage.updateTenant(req.params.id, req.body, userId);
       if (!tenant) {
         return res.status(404).json({ error: "Tenant not found" });
@@ -195,7 +195,7 @@ export async function registerRoutes(
 
   app.delete("/api/tenants/:id", requireAuth, async (req, res) => {
     try {
-      const userId = req.session.userId!;
+      const userId = req.user!.id;
       const deleted = await storage.deleteTenant(req.params.id, userId);
       if (!deleted) {
         return res.status(404).json({ error: "Tenant not found" });
@@ -209,7 +209,7 @@ export async function registerRoutes(
   // Payment routes (protected)
   app.get("/api/payments", requireAuth, async (req, res) => {
     try {
-      const userId = req.session.userId!;
+      const userId = req.user!.id;
       const payments = await storage.getAllPayments(userId);
       res.json(payments);
     } catch (error) {
@@ -219,7 +219,7 @@ export async function registerRoutes(
 
   app.get("/api/payments/:id", requireAuth, async (req, res) => {
     try {
-      const userId = req.session.userId!;
+      const userId = req.user!.id;
       const payment = await storage.getPayment(req.params.id, userId);
       if (!payment) {
         return res.status(404).json({ error: "Payment not found" });
@@ -232,7 +232,7 @@ export async function registerRoutes(
 
   app.post("/api/payments", requireAuth, async (req, res) => {
     try {
-      const userId = req.session.userId!;
+      const userId = req.user!.id;
       const parsed = insertPaymentSchema.safeParse(req.body);
       if (!parsed.success) {
         return res.status(400).json({ error: "Invalid payment data", details: parsed.error.errors });
@@ -246,7 +246,7 @@ export async function registerRoutes(
 
   app.patch("/api/payments/:id", requireAuth, async (req, res) => {
     try {
-      const userId = req.session.userId!;
+      const userId = req.user!.id;
       const payment = await storage.updatePayment(req.params.id, req.body, userId);
       if (!payment) {
         return res.status(404).json({ error: "Payment not found" });
@@ -259,7 +259,7 @@ export async function registerRoutes(
 
   app.delete("/api/payments/:id", requireAuth, async (req, res) => {
     try {
-      const userId = req.session.userId!;
+      const userId = req.user!.id;
       const deleted = await storage.deletePayment(req.params.id, userId);
       if (!deleted) {
         return res.status(404).json({ error: "Payment not found" });
@@ -273,7 +273,7 @@ export async function registerRoutes(
 
   app.get("/api/payments/:id/transactions", requireAuth, async (req, res) => {
     try {
-      const userId = req.session.userId!;
+      const userId = req.user!.id;
       const payment = await storage.getPayment(req.params.id, userId);
       if (!payment) {
         return res.status(404).json({ error: "Payment not found" });
@@ -287,7 +287,7 @@ export async function registerRoutes(
 
   app.post("/api/payments/:id/transactions", requireAuth, async (req, res) => {
     try {
-      const userId = req.session.userId!;
+      const userId = req.user!.id;
       const paymentId = req.params.id;
       const payment = await storage.getPayment(paymentId, userId);
       if (!payment) {
@@ -329,7 +329,7 @@ export async function registerRoutes(
   // Maintenance routes (protected)
   app.get("/api/maintenance", requireAuth, async (req, res) => {
     try {
-      const userId = req.session.userId!;
+      const userId = req.user!.id;
       const requests = await storage.getAllMaintenanceRequests(userId);
       res.json(requests);
     } catch (error) {
@@ -339,7 +339,7 @@ export async function registerRoutes(
 
   app.get("/api/maintenance/:id", requireAuth, async (req, res) => {
     try {
-      const userId = req.session.userId!;
+      const userId = req.user!.id;
       const request = await storage.getMaintenanceRequest(req.params.id, userId);
       if (!request) {
         return res.status(404).json({ error: "Maintenance request not found" });
@@ -352,7 +352,7 @@ export async function registerRoutes(
 
   app.post("/api/maintenance", requireAuth, async (req, res) => {
     try {
-      const userId = req.session.userId!;
+      const userId = req.user!.id;
       const parsed = insertMaintenanceRequestSchema.safeParse(req.body);
       if (!parsed.success) {
         return res.status(400).json({ error: "Invalid maintenance request data", details: parsed.error.errors });
@@ -366,7 +366,7 @@ export async function registerRoutes(
 
   app.patch("/api/maintenance/:id", requireAuth, async (req, res) => {
     try {
-      const userId = req.session.userId!;
+      const userId = req.user!.id;
       const request = await storage.updateMaintenanceRequest(req.params.id, req.body, userId);
       if (!request) {
         return res.status(404).json({ error: "Maintenance request not found" });
@@ -379,7 +379,7 @@ export async function registerRoutes(
 
   app.delete("/api/maintenance/:id", requireAuth, async (req, res) => {
     try {
-      const userId = req.session.userId!;
+      const userId = req.user!.id;
       const deleted = await storage.deleteMaintenanceRequest(req.params.id, userId);
       if (!deleted) {
         return res.status(404).json({ error: "Maintenance request not found" });
@@ -393,7 +393,7 @@ export async function registerRoutes(
   // Expense routes (protected)
   app.get("/api/expenses", requireAuth, async (req, res) => {
     try {
-      const userId = req.session.userId!;
+      const userId = req.user!.id;
       const expenses = await storage.getAllExpenses(userId);
       res.json(expenses);
     } catch (error) {
@@ -403,7 +403,7 @@ export async function registerRoutes(
 
   app.get("/api/expenses/:id", requireAuth, async (req, res) => {
     try {
-      const userId = req.session.userId!;
+      const userId = req.user!.id;
       const expense = await storage.getExpense(req.params.id, userId);
       if (!expense) {
         return res.status(404).json({ error: "Expense not found" });
@@ -416,7 +416,7 @@ export async function registerRoutes(
 
   app.post("/api/expenses", requireAuth, async (req, res) => {
     try {
-      const userId = req.session.userId!;
+      const userId = req.user!.id;
       const parsed = insertExpenseSchema.safeParse(req.body);
       if (!parsed.success) {
         return res.status(400).json({ error: "Invalid expense data", details: parsed.error.errors });
@@ -430,7 +430,7 @@ export async function registerRoutes(
 
   app.patch("/api/expenses/:id", requireAuth, async (req, res) => {
     try {
-      const userId = req.session.userId!;
+      const userId = req.user!.id;
       const expense = await storage.updateExpense(req.params.id, req.body, userId);
       if (!expense) {
         return res.status(404).json({ error: "Expense not found" });
@@ -443,7 +443,7 @@ export async function registerRoutes(
 
   app.delete("/api/expenses/:id", requireAuth, async (req, res) => {
     try {
-      const userId = req.session.userId!;
+      const userId = req.user!.id;
       const deleted = await storage.deleteExpense(req.params.id, userId);
       if (!deleted) {
         return res.status(404).json({ error: "Expense not found" });
@@ -456,7 +456,7 @@ export async function registerRoutes(
 
   app.get("/api/expenses/report", requireAuth, async (req, res) => {
     try {
-      const userId = req.session.userId!;
+      const userId = req.user!.id;
       const { startDate, endDate } = req.query;
       const report = await storage.getExpenseReport(
         userId,
