@@ -291,41 +291,45 @@ async function seedDemoUser() {
 import { fileURLToPath } from "url";
 
 // Setup logic
-try {
-  await lowercaseExistingEmails();
-  await seedDemoUser();
-  await registerRoutes(httpServer, app);
-} catch (err) {
-  log(`CRITICAL: Failed to start server components: ${err instanceof Error ? err.stack : err}`, "error");
+async function startServer() {
+  try {
+    await lowercaseExistingEmails();
+    await seedDemoUser();
+    await registerRoutes(httpServer, app);
+  } catch (err) {
+    log(`CRITICAL: Failed to start server components: ${err instanceof Error ? err.stack : err}`, "error");
+  }
+
+  app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
+    const status = err.status || err.statusCode || 500;
+    const message = err.message || "Internal Server Error";
+
+    log(`ERROR: ${message} - ${err.stack}`, "error");
+    res.status(status).json({ message, details: process.env.NODE_ENV === "development" ? err.stack : undefined });
+  });
+
+  if (process.env.NODE_ENV === "production") {
+    serveStatic(app);
+  } else {
+    const { setupVite } = await import("./vite");
+    await setupVite(httpServer, app);
+  }
+
+  // Only listen if running directly
+  if (process.argv[1] === fileURLToPath(import.meta.url)) {
+    const port = parseInt(process.env.PORT || "5000", 10);
+    httpServer.listen(
+      {
+        port,
+        host: "0.0.0.0",
+      },
+      () => {
+        log(`serving on port ${port}`);
+      },
+    );
+  }
 }
 
-app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
-  const status = err.status || err.statusCode || 500;
-  const message = err.message || "Internal Server Error";
-
-  log(`ERROR: ${message} - ${err.stack}`, "error");
-  res.status(status).json({ message, details: process.env.NODE_ENV === "development" ? err.stack : undefined });
-});
-
-if (process.env.NODE_ENV === "production") {
-  serveStatic(app);
-} else {
-  const { setupVite } = await import("./vite");
-  await setupVite(httpServer, app);
-}
-
-// Only listen if running directly
-if (process.argv[1] === fileURLToPath(import.meta.url)) {
-  const port = parseInt(process.env.PORT || "5000", 10);
-  httpServer.listen(
-    {
-      port,
-      host: "0.0.0.0",
-    },
-    () => {
-      log(`serving on port ${port}`);
-    },
-  );
-}
+startServer();
 
 export default app;
