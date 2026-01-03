@@ -3,17 +3,31 @@ import fs from "fs";
 import path from "path";
 
 export function serveStatic(app: Express) {
-  const distPath = path.resolve(__dirname, "public");
-  if (!fs.existsSync(distPath)) {
-    throw new Error(
-      `Could not find the build directory: ${distPath}, make sure to build the client first`,
-    );
+  // Use process.cwd() which is the most reliable way to find the project root in Vercel/Node
+  const distPath = path.resolve(process.cwd(), "dist");
+
+  if (!fs.existsSync(path.join(distPath, "index.html"))) {
+    console.warn(`Static assets directory not found at ${distPath}. Checking alternative paths...`);
+
+    // Fallback for cases where we might be running inside the dist folder itself
+    const altPath = path.resolve(process.cwd());
+    if (fs.existsSync(path.join(altPath, "index.html"))) {
+      serve(app, altPath);
+      return;
+    }
+
+    console.error("Could not find static assets. The application may show a blank page.");
+    return;
   }
 
-  app.use(express.static(distPath));
+  serve(app, distPath);
+}
 
-  // fall through to index.html if the file doesn't exist
+function serve(app: Express, staticPath: string) {
+  app.use(express.static(staticPath));
+
+  // Catch-all route for SPA
   app.use("*", (_req, res) => {
-    res.sendFile(path.resolve(distPath, "index.html"));
+    res.sendFile(path.resolve(staticPath, "index.html"));
   });
 }
