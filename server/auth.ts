@@ -77,9 +77,8 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
             email: user.email!,
         };
 
-        // Ensure we have the user in our local db (synced via trigger usually, but good to check)
-        // We rely on the trigger, but we could do a lazy sync here if we wanted.
-        // For now, assume trigger worked.
+        // We rely on the database trigger to sync the user to the 'users' table.
+        // The trigger 'on_auth_user_created' handles this on signup.
 
         next();
     } catch (err) {

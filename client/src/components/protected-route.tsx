@@ -11,7 +11,7 @@ interface ProtectedRouteProps {
  * Redirects to /login if user is not authenticated
  */
 export function ProtectedRoute({ children }: ProtectedRouteProps) {
-    const { isAuthenticated, isLoading } = useAuth();
+    const { user, isLoading } = useAuth();
     const [_, setLocation] = useLocation();
 
     // Show loading state while checking authentication
@@ -27,10 +27,16 @@ export function ProtectedRoute({ children }: ProtectedRouteProps) {
     }
 
     // Redirect to login if not authenticated
-    if (!isAuthenticated) {
+    if (!isLoading && !user) {
         setLocation("/login");
         return null;
     }
+
+    // Role-based access control (Phase 4 of requirements)
+    // If the user is authenticated but accessing a route not meant for their role, redirect them.
+    // For now, we allow access to all routes, but we can implement specific checks here.
+    // Example:
+    // if (user?.role === 'tenant' && isAdminRoute(location)) { ... }
 
     // Render protected content
     return <>{children}</>;

@@ -119,7 +119,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                     email,
                     password,
                     options: {
-                        data: { username },
+                        data: {
+                            username,
+                            role: (credentials as any).role || 'tenant' // Default role
+                        },
                     },
                 });
                 if (error) throw error;
@@ -146,19 +149,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     return (
         <AuthContext.Provider
-      value= {{
-        user,
-            isLoading,
-            error: null,
+            value={{
+                user,
+                isLoading,
+                error: null,
                 loginMutation,
                 logoutMutation,
                 registerMutation,
-      }
-}
-    >
-    { children }
-    </AuthContext.Provider>
-  );
+            }
+            }
+        >
+            {children}
+        </AuthContext.Provider>
+    );
 }
 
 export function useAuth() {
