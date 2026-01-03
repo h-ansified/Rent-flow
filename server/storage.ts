@@ -753,6 +753,53 @@ class DatabaseStorage {
       .where(and(...conditions))
       .orderBy(desc(expenses.dueDate));
   }
+
+  // ===================
+  // TENANT PORTAL METHODS
+  // ===================
+
+  async getTenantByEmail(email: string): Promise<Tenant | undefined> {
+    const [tenant] = await db
+      .select()
+      .from(tenants)
+      .where(eq(tenants.email, email))
+      .limit(1);
+    return tenant;
+  }
+
+  async getTenantProperty(tenantId: string): Promise<Property | undefined> {
+    const [tenant] = await db
+      .select()
+      .from(tenants)
+      .where(eq(tenants.id, tenantId))
+      .limit(1);
+
+    if (!tenant) return undefined;
+
+    const [property] = await db
+      .select()
+      .from(properties)
+      .where(eq(properties.id, tenant.propertyId))
+      .limit(1);
+
+    return property;
+  }
+
+  async getTenantPayments(tenantId: string): Promise<Payment[]> {
+    return await db
+      .select()
+      .from(payments)
+      .where(eq(payments.tenantId, tenantId))
+      .orderBy(desc(payments.dueDate));
+  }
+
+  async getTenantMaintenance(tenantId: string): Promise<MaintenanceRequest[]> {
+    return await db
+      .select()
+      .from(maintenanceRequests)
+      .where(eq(maintenanceRequests.tenantId, tenantId))
+      .orderBy(desc(maintenanceRequests.createdAt));
+  }
 }
 
 // Export singleton instance

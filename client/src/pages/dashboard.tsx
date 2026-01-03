@@ -29,6 +29,8 @@ import {
 import type { DashboardMetrics, RevenueData, Activity, Payment, Tenant } from "@shared/schema";
 import { useAuth } from "@/hooks/use-auth";
 import { formatCurrency, getCurrencySymbol } from "@/lib/currency-utils";
+import TenantDashboard from "./tenant-dashboard";
+
 
 function MetricCard({
   title,
@@ -164,6 +166,10 @@ export default function Dashboard() {
     { name: "Occupied", value: metrics.occupiedUnits, color: "hsl(var(--chart-1))" },
     { name: "Vacant", value: metrics.totalUnits - metrics.occupiedUnits, color: "hsl(var(--muted))" },
   ] : [];
+
+  if (user?.role === "tenant") {
+    return <TenantDashboard />;
+  }
 
   return (
     <div className="p-6 space-y-6">

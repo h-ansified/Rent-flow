@@ -70,6 +70,8 @@ import {
 } from "@/components/ui/alert-dialog";
 import type { Tenant, Property } from "@shared/schema";
 import { useAuth } from "@/hooks/use-auth";
+import { supabase } from "@/lib/supabase";
+
 
 const tenantFormSchema = z.object({
   firstName: z.string().min(1, "First name is required"),
@@ -203,6 +205,28 @@ export default function Tenants() {
       });
     },
   });
+
+  const handleSendMagicLink = async (email: string) => {
+    try {
+      const { error } = await supabase.auth.signInWithOtp({
+        email,
+        options: {
+          emailRedirectTo: `${window.location.origin}/`,
+        },
+      });
+      if (error) throw error;
+      toast({
+        title: "Link Sent",
+        description: `Login link sent to ${email}`,
+      });
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    }
+  };
 
   const filteredTenants = tenants?.filter((tenant) => {
     const fullName = `${tenant.firstName} ${tenant.lastName}`.toLowerCase();
@@ -468,11 +492,9 @@ export default function Tenants() {
                             <Eye className="h-4 w-4 mr-2" />
                             View Details
                           </DropdownMenuItem>
-                          <DropdownMenuItem asChild>
-                            <a href={`mailto:${tenant.email}`} className="flex items-center w-full cursor-pointer">
-                              <Mail className="h-4 w-4 mr-2" />
-                              Send Email
-                            </a>
+                          <DropdownMenuItem onClick={() => handleSendMagicLink(tenant.email)}>
+                            <Mail className="h-4 w-4 mr-2" />
+                            Send Login Link
                           </DropdownMenuItem>
                           <DropdownMenuItem asChild>
                             <a href={`tel:${tenant.phone}`} className="flex items-center w-full cursor-pointer">

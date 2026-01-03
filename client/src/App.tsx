@@ -21,8 +21,23 @@ import Login from "@/pages/login";
 import Signup from "@/pages/signup";
 import Welcome from "@/pages/welcome";
 import ForgotPassword from "@/pages/forgot-password";
+import TenantDashboard from "@/pages/tenant-dashboard";
+import { useAuth, AuthProvider } from "@/hooks/use-auth";
 
 function ProtectedRouter() {
+  const { user } = useAuth();
+
+  if (user?.role === 'tenant') {
+    return (
+      <Switch>
+        <Route path="/" component={TenantDashboard} />
+        <Route path="/maintenance" component={Maintenance} />
+        <Route path="/settings" component={Settings} />
+        <Route component={TenantDashboard} />
+      </Switch>
+    );
+  }
+
   return (
     <Switch>
       <Route path="/" component={Dashboard} />
@@ -74,8 +89,6 @@ function Router() {
     </Switch>
   );
 }
-
-import { AuthProvider } from "@/hooks/use-auth";
 
 function App() {
   return (

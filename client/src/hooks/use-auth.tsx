@@ -14,6 +14,7 @@ type AuthContextType = {
     logoutMutation: {
         mutate: () => void;
     };
+    logout: () => void;
     registerMutation: {
         mutateAsync: (credentials: any) => Promise<void>;
         isPending: boolean;
@@ -112,7 +113,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     const registerMutation = {
         isPending: isRegisterPending,
-        mutateAsync: async ({ email, password, username }: any) => {
+        mutateAsync: async ({ email, password, username, role }: any) => {
             setIsRegisterPending(true);
             try {
                 const { error } = await supabase.auth.signUp({
@@ -121,7 +122,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                     options: {
                         data: {
                             username,
-                            role: (credentials as any).role || 'tenant' // Default role
+                            role: role || 'tenant' // Default role
                         },
                     },
                 });
@@ -155,6 +156,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                 error: null,
                 loginMutation,
                 logoutMutation,
+                logout: logoutMutation.mutate,
                 registerMutation,
             }
             }

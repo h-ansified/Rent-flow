@@ -469,5 +469,50 @@ export async function registerRoutes(
     }
   });
 
+
+  // Tenant Portal Routes
+  app.get("/api/tenant/me", requireAuth, async (req, res) => {
+    try {
+      const email = req.user!.email;
+      const tenant = await storage.getTenantByEmail(email);
+      if (!tenant) {
+        return res.status(404).json({ error: "Tenant profile not found" });
+      }
+      res.json(tenant);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch tenant profile" });
+    }
+  });
+
+  app.get("/api/tenant/dashboard", requireAuth, async (req, res) => {
+    try {
+      const email = req.user!.email;
+      const tenant = await storage.getTenantByEmail(email);
+
+      if (!tenant) {
+        return res.status(404).json({ error: "Tenant profile not found" });
+      }
+
+      const [property, payments, maintenance] = await Promise.all([
+        storage.getTenantProperty(tenant.id),
+        storage.getTenantPayments(tenant.id),
+        storage.getTenantMaintenance(tenant.id)
+      ]);
+
+      const nextPayment = payments.find(p => p.status === 'pending' || p.status === 'overdue');
+
+      res.json({
+        tenant,
+        property,
+        payments,
+        maintenance,
+        nextPayment
+      });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch tenant dashboard" });
+    }
+  });
+
   return httpServer;
+
 }

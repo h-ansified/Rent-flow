@@ -26,38 +26,48 @@ import {
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 
-const mainNavItems = [
-  {
-    title: "Dashboard",
-    url: "/",
-    icon: LayoutDashboard,
-  },
-  {
-    title: "Properties",
-    url: "/properties",
-    icon: Building2,
-  },
-  {
-    title: "Tenants",
-    url: "/tenants",
-    icon: Users,
-  },
-  {
-    title: "Payments",
-    url: "/payments",
-    icon: CreditCard,
-  },
-  {
-    title: "Maintenance",
-    url: "/maintenance",
-    icon: Wrench,
-  },
-  {
-    title: "Expenses",
-    url: "/expenses",
-    icon: Wallet,
-  },
-];
+const getMainNavItems = (role?: string) => {
+  const allItems = [
+    {
+      title: "Dashboard",
+      url: "/",
+      icon: LayoutDashboard,
+      roles: ["landlord", "tenant"],
+    },
+    {
+      title: "Properties",
+      url: "/properties",
+      icon: Building2,
+      roles: ["landlord"],
+    },
+    {
+      title: "Tenants",
+      url: "/tenants",
+      icon: Users,
+      roles: ["landlord"],
+    },
+    {
+      title: "Payments",
+      url: "/payments",
+      icon: CreditCard,
+      roles: ["landlord", "tenant"],
+    },
+    {
+      title: "Maintenance",
+      url: "/maintenance",
+      icon: Wrench,
+      roles: ["landlord", "tenant"],
+    },
+    {
+      title: "Expenses",
+      url: "/expenses",
+      icon: Wallet,
+      roles: ["landlord"],
+    },
+  ];
+
+  return allItems.filter(item => !role || item.roles.includes(role));
+};
 
 const secondaryNavItems = [
   {
@@ -104,7 +114,7 @@ export function AppSidebar() {
           </div>
           <div className="flex flex-col">
             <span className="text-lg font-semibold" data-testid="text-app-name">PropertyPro</span>
-            <span className="text-xs text-muted-foreground">Landlord Dashboard</span>
+            <span className="text-xs text-muted-foreground">{user?.role === 'tenant' ? 'Tenant Portal' : 'Landlord Dashboard'}</span>
           </div>
         </div>
       </SidebarHeader>
@@ -114,7 +124,7 @@ export function AppSidebar() {
           <SidebarGroupLabel>Main Menu</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
-              {mainNavItems.map((item) => (
+              {getMainNavItems(user?.role).map((item) => (
                 <SidebarMenuItem key={item.title}>
                   <SidebarMenuButton
                     asChild
