@@ -38,6 +38,10 @@ export default defineConfig(async () => {
       outDir: path.resolve(import.meta.dirname, "dist"),
       emptyOutDir: true,
     },
+    define: {
+      'process.env.VITE_SUPABASE_URL': JSON.stringify(process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL),
+      'process.env.VITE_SUPABASE_ANON_KEY': JSON.stringify(process.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY),
+    },
     server: {
       fs: {
         strict: true,

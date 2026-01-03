@@ -291,45 +291,58 @@ async function seedDemoUser() {
 import { fileURLToPath } from "url";
 
 // Setup logic
-async function startServer() {
+async function initServer() {
   try {
-    await lowercaseExistingEmails();
-    await seedDemoUser();
+    // 1. Core setup
     await registerRoutes(httpServer, app);
+
+    // 2. Static files
+    if (process.env.NODE_ENV === "production") {
+      serveStatic(app);
+    } else {
+      const { setupVite } = await import("./vite");
+      await setupVite(httpServer, app);
+    }
+
+    // 3. Background tasks (non-blocking for route registration)
+    lowercaseExistingEmails().catch(e => log(`Email sync error: ${e}`, "error"));
+    seedDemoUser().catch(e => log(`Seeding error: ${e}`, "error"));
+
   } catch (err) {
-    log(`CRITICAL: Failed to start server components: ${err instanceof Error ? err.stack : err}`, "error");
+    log(`CRITICAL: Failed to initialize server: ${err instanceof Error ? err.stack : err}`, "error");
   }
 
+  // Error handling middleware (must be last)
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
     const status = err.status || err.statusCode || 500;
     const message = err.message || "Internal Server Error";
-
     log(`ERROR: ${message} - ${err.stack}`, "error");
     res.status(status).json({ message, details: process.env.NODE_ENV === "development" ? err.stack : undefined });
   });
-
-  if (process.env.NODE_ENV === "production") {
-    serveStatic(app);
-  } else {
-    const { setupVite } = await import("./vite");
-    await setupVite(httpServer, app);
-  }
-
-  // Only listen if running directly
-  if (require.main === module) {
-    const port = parseInt(process.env.PORT || "5000", 10);
-    httpServer.listen(
-      {
-        port,
-        host: "0.0.0.0",
-      },
-      () => {
-        log(`serving on port ${port}`);
-      },
-    );
-  }
 }
 
-startServer();
+// Initialize server components
+export const initPromise = initServer();
+
+// For local development
+if (process.env.NODE_ENV !== "test") {
+  const port = parseInt(process.env.PORT || "5000", 10);
+  // We don't await here to allow the module to export the app immediately,
+  // but the server will only start listening once initPromise is resolved.
+  initPromise.then(() => {
+    // Only listen if this is the main module (not imported as a serverless function)
+    const isMain = process.argv[1] && (
+      process.argv[1].endsWith('index.ts') ||
+      process.argv[1].endsWith('index.js') ||
+      process.argv[1].endsWith('index.cjs')
+    );
+
+    if (isMain) {
+      httpServer.listen({ port, host: "0.0.0.0" }, () => {
+        log(`serving on port ${port}`);
+      });
+    }
+  });
+}
 
 export default app;
