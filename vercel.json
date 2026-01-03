@@ -15,11 +15,11 @@
             "dest": "/api/index.ts"
         },
         {
-            "handle": "filesystem"
-        },
-        {
             "src": "/(.*)",
-            "dest": "/index.html"
+            "dest": "/$1",
+            "headers": {
+                "cache-control": "public, max-age=0, must-revalidate"
+            }
         }
     ]
 }
