@@ -301,14 +301,17 @@ export default function Maintenance() {
 
   const { data: requests, isLoading } = useQuery<MaintenanceWithDetails[]>({
     queryKey: ["/api/maintenance"],
+    enabled: !!user,
   });
 
   const { data: properties } = useQuery<Property[]>({
     queryKey: ["/api/properties"],
+    enabled: !!user,
   });
 
   const { data: tenants } = useQuery<(Tenant & { propertyName: string })[]>({
     queryKey: ["/api/tenants"],
+    enabled: !!user,
   });
 
   const form = useForm<MaintenanceFormValues>({

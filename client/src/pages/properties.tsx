@@ -193,6 +193,7 @@ export default function Properties() {
 
   const { data: properties, isLoading } = useQuery<Property[]>({
     queryKey: ["/api/properties"],
+    enabled: !!user,
   });
 
   const form = useForm<PropertyFormValues>({

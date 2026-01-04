@@ -144,22 +144,27 @@ export default function Dashboard() {
 
   const { data: metrics, isLoading: metricsLoading } = useQuery<DashboardMetrics>({
     queryKey: ["/api/dashboard/metrics"],
+    enabled: !!user,
   });
 
   const { data: revenueData, isLoading: revenueLoading } = useQuery<RevenueData[]>({
     queryKey: ["/api/dashboard/revenue"],
+    enabled: !!user,
   });
 
   const { data: activities, isLoading: activitiesLoading } = useQuery<Activity[]>({
     queryKey: ["/api/dashboard/activities"],
+    enabled: !!user,
   });
 
   const { data: upcomingPayments, isLoading: paymentsLoading } = useQuery<(Payment & { tenantName: string; propertyName: string })[]>({
     queryKey: ["/api/dashboard/upcoming-payments"],
+    enabled: !!user,
   });
 
   const { data: expiringLeases, isLoading: leasesLoading } = useQuery<(Tenant & { propertyName: string })[]>({
     queryKey: ["/api/dashboard/expiring-leases"],
+    enabled: !!user,
   });
 
   const occupancyData = metrics ? [

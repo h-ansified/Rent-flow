@@ -219,10 +219,12 @@ export default function Payments() {
 
   const { data: payments, isLoading } = useQuery<PaymentWithDetails[]>({
     queryKey: ["/api/payments"],
+    enabled: !!user,
   });
 
   const { data: tenants } = useQuery<Tenant[]>({
     queryKey: ["/api/tenants"],
+    enabled: !!user,
   });
 
   const { data: paymentHistory } = useQuery<PaymentHistory[]>({

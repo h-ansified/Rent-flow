@@ -309,13 +309,14 @@ export default function Expenses() {
     const [reference, setReference] = useState("");
     const [paymentNotes, setPaymentNotes] = useState("");
 
-    const { data: expenses, isLoading, error } = useQuery<ExpenseWithProperty[]>({
+    const { data: expenses, isLoading, error } = useQuery<Expense[]>({
         queryKey: ["/api/expenses"],
-        retry: 1,
+        enabled: !!user,
     });
 
     const { data: properties } = useQuery<Property[]>({
         queryKey: ["/api/properties"],
+        enabled: !!user,
     });
 
     const createExpenseMutation = useMutation({
@@ -378,23 +379,8 @@ export default function Expenses() {
     });
 
     // Handle error state AFTER all hooks have been called
-    if (error) {
-        return (
-            <div className="p-6">
-                <Alert variant="destructive">
-                    <AlertCircle className="h-4 w-4" />
-                    <AlertTitle>Database Error</AlertTitle>
-                    <AlertDescription>
-                        Failed to load expenses. This usually means the expenses table hasn't been created yet.
-                        <br /><br />
-                        <strong>To fix this:</strong> Run <code className="bg-muted px-2 py-1 rounded">npm run db:push</code> in your terminal.
-                        <br /><br />
-                        If PowerShell gives an error, first run: <code className="bg-muted px-2 py-1 rounded">Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser</code>
-                    </AlertDescription>
-                </Alert>
-            </div>
-        );
-    }
+    // REPLACED: We now show a plain empty state even on error to match other tabs
+    // if (error) { ... }
 
     const resetForm = () => {
         setTitle("");

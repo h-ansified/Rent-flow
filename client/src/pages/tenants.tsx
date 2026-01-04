@@ -132,10 +132,12 @@ export default function Tenants() {
 
   const { data: tenants, isLoading: tenantsLoading } = useQuery<TenantWithProperty[]>({
     queryKey: ["/api/tenants"],
+    enabled: !!user,
   });
 
   const { data: properties } = useQuery<Property[]>({
     queryKey: ["/api/properties"],
+    enabled: !!user,
   });
 
   const form = useForm<TenantFormValues>({
