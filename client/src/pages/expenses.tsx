@@ -54,6 +54,7 @@ import type { Expense, Property } from "@shared/schema";
 import { useAuth } from "@/hooks/use-auth";
 import { formatCurrency } from "@/lib/currency-utils";
 import { generateExpenseReportPDF } from "@/lib/pdf-generators";
+import { ErrorBoundary } from "@/components/error-boundary";
 
 type ExpenseWithProperty = Expense & { propertyName?: string };
 
@@ -312,6 +313,11 @@ export default function Expenses() {
     const { data: expenses, isLoading, error } = useQuery<Expense[]>({
         queryKey: ["/api/expenses"],
         enabled: !!user,
+        retry: false,
+        onError: (error: any) => {
+            console.error("Failed to fetch expenses:", error);
+            // Error is handled by showing empty state, but we log it for debugging
+        },
     });
 
     const { data: properties } = useQuery<Property[]>({
@@ -487,7 +493,8 @@ export default function Expenses() {
     const recurringCount = expenses?.filter(e => e.isRecurring).length || 0;
 
     return (
-        <div className="p-6 space-y-6">
+        <ErrorBoundary>
+            <div className="p-6 space-y-6">
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                 <div>
                     <h1 className="text-3xl font-semibold">Expenses</h1>
@@ -625,6 +632,26 @@ export default function Expenses() {
                             onRecord={() => setSelectedExpense(expense)}
                         />
                     ))
+                ) : error ? (
+                    <div className="col-span-full py-20 flex flex-col items-center justify-center glass-card rounded-[3rem]">
+                        <div className="h-20 w-20 rounded-full bg-destructive/10 flex items-center justify-center mb-6">
+                            <AlertCircle className="h-10 w-10 text-destructive" />
+                        </div>
+                        <h3 className="text-2xl font-bold mb-2">Failed to load expenses</h3>
+                        <p className="text-muted-foreground text-center max-w-sm mb-4">
+                            {error instanceof Error ? error.message : "Unable to load expenses. Please try again."}
+                        </p>
+                        <Button
+                            variant="outline"
+                            className="mt-4"
+                            onClick={() => {
+                                queryClient.invalidateQueries({ queryKey: ["/api/expenses"] });
+                            }}
+                        >
+                            <Repeat className="h-4 w-4 mr-2" />
+                            Retry
+                        </Button>
+                    </div>
                 ) : (
                     <div className="col-span-full py-20 flex flex-col items-center justify-center glass-card rounded-[3rem]">
                         <div className="h-20 w-20 rounded-full bg-muted flex items-center justify-center mb-6">
@@ -1003,5 +1030,6 @@ export default function Expenses() {
                 </DialogContent>
             </Dialog>
         </div>
+        </ErrorBoundary>
     );
 }

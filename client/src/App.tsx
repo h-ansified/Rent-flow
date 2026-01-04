@@ -23,6 +23,7 @@ import Welcome from "@/pages/welcome";
 import ForgotPassword from "@/pages/forgot-password";
 import TenantDashboard from "@/pages/tenant-dashboard";
 import { useAuth, AuthProvider } from "@/hooks/use-auth";
+import { ErrorBoundary } from "@/components/error-boundary";
 
 function ProtectedRouter() {
   const { user } = useAuth();
@@ -92,14 +93,16 @@ function Router() {
 
 function App() {
   return (
-    <QueryClientProvider client={queryClient}>
-      <AuthProvider>
-        <TooltipProvider>
-          <Router />
-          <Toaster />
-        </TooltipProvider>
-      </AuthProvider>
-    </QueryClientProvider>
+    <ErrorBoundary>
+      <QueryClientProvider client={queryClient}>
+        <AuthProvider>
+          <TooltipProvider>
+            <Router />
+            <Toaster />
+          </TooltipProvider>
+        </AuthProvider>
+      </QueryClientProvider>
+    </ErrorBoundary>
   );
 }
 
