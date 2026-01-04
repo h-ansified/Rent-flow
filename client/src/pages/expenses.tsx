@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -301,7 +301,7 @@ export default function Expenses() {
     const [expiryDate, setExpiryDate] = useState("");
     const [isRecurring, setIsRecurring] = useState(false);
     const [frequency, setFrequency] = useState("monthly");
-    const [propertyId, setPropertyId] = useState("");
+    const [propertyId, setPropertyId] = useState("general");
     const [notes, setNotes] = useState("");
 
     // Payment recording state
@@ -315,10 +315,36 @@ export default function Expenses() {
         enabled: !!user,
         retry: false,
         onError: (error: any) => {
+            // #region agent log
+            if (typeof window !== 'undefined') {
+                fetch('http://127.0.0.1:7242/ingest/3ed85ae8-4691-4490-b4b4-297755767225', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ location: 'client/src/pages/expenses.tsx:317', message: 'Expenses query error', data: { errorMessage: error?.message, errorStatus: (error as any)?.status, hasUser: !!user }, timestamp: Date.now(), sessionId: 'debug-session', runId: 'run1', hypothesisId: 'F' }) }).catch(() => { });
+            }
+            // #endregion
             console.error("Failed to fetch expenses:", error);
+            console.error("Error details:", {
+                message: error?.message,
+                status: (error as any)?.status,
+                stack: error?.stack,
+            });
             // Error is handled by showing empty state, but we log it for debugging
         },
     });
+
+    // Diagnostic query to check server health
+    const { data: diagnostic } = useQuery({
+        queryKey: ["/api/diagnostic"],
+        enabled: !!user && !!error, // Only run if there's an error
+        retry: false,
+        staleTime: 60000, // Cache for 1 minute
+    });
+
+    // #region agent log
+    useEffect(() => {
+        if (typeof window !== 'undefined') {
+            fetch('http://127.0.0.1:7242/ingest/3ed85ae8-4691-4490-b4b4-297755767225', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ location: 'client/src/pages/expenses.tsx:322', message: 'Expenses query state', data: { isLoading, hasError: !!error, hasData: !!expenses, dataCount: expenses?.length, hasUser: !!user }, timestamp: Date.now(), sessionId: 'debug-session', runId: 'run1', hypothesisId: 'F' }) }).catch(() => { });
+        }
+    }, [isLoading, error, expenses, user]);
+    // #endregion
 
     const { data: properties } = useQuery<Property[]>({
         queryKey: ["/api/properties"],
@@ -327,9 +353,15 @@ export default function Expenses() {
 
     const createExpenseMutation = useMutation({
         mutationFn: async (data: any) => {
+            // #region agent log
+            fetch('http://127.0.0.1:7242/ingest/3ed85ae8-4691-4490-b4b4-297755767225', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ location: 'client/src/pages/expenses.tsx:329', message: 'createExpenseMutation called', data: { dataKeys: Object.keys(data || {}), hasTitle: !!data?.title, hasAmount: !!data?.amount }, timestamp: Date.now(), sessionId: 'debug-session', runId: 'run1', hypothesisId: 'A' }) }).catch(() => { });
+            // #endregion
             return apiRequest("POST", "/api/expenses", data);
         },
         onSuccess: () => {
+            // #region agent log
+            fetch('http://127.0.0.1:7242/ingest/3ed85ae8-4691-4490-b4b4-297755767225', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ location: 'client/src/pages/expenses.tsx:332', message: 'Expense creation success', data: { timestamp: Date.now() }, timestamp: Date.now(), sessionId: 'debug-session', runId: 'run1', hypothesisId: 'A' }) }).catch(() => { });
+            // #endregion
             queryClient.invalidateQueries({ queryKey: ["/api/expenses"] });
             queryClient.invalidateQueries({ queryKey: ["/api/dashboard"] });
             resetForm();
@@ -340,6 +372,9 @@ export default function Expenses() {
             });
         },
         onError: (error: any) => {
+            // #region agent log
+            fetch('http://127.0.0.1:7242/ingest/3ed85ae8-4691-4490-b4b4-297755767225', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ location: 'client/src/pages/expenses.tsx:342', message: 'Expense creation error', data: { errorMessage: error?.message, errorStatus: (error as any)?.status }, timestamp: Date.now(), sessionId: 'debug-session', runId: 'run1', hypothesisId: 'A' }) }).catch(() => { });
+            // #endregion
             console.error("Expense creation error:", error);
             toast({
                 title: "Error",
@@ -396,7 +431,7 @@ export default function Expenses() {
         setExpiryDate("");
         setIsRecurring(false);
         setFrequency("monthly");
-        setPropertyId("");
+        setPropertyId("general");
         setNotes("");
     };
 
@@ -428,7 +463,7 @@ export default function Expenses() {
             expiryDate: expiryDate || null,
             isRecurring,
             frequency: isRecurring ? frequency : null,
-            propertyId: propertyId || null,
+            propertyId: propertyId === "general" ? null : propertyId,
             notes,
             status: "pending",
         });
@@ -460,450 +495,441 @@ export default function Expenses() {
         }
     };
 
-    // Calculate category stats
-    const categoryStats = expenses?.reduce((acc, expense) => {
-        if (!acc[expense.category]) {
-            acc[expense.category] = {
-                totalAmount: 0,
-                paidAmount: 0,
-                pendingCount: 0,
-                overdueCount: 0,
-                count: 0,
-            };
-        }
-        acc[expense.category].totalAmount += expense.amount;
-        acc[expense.category].paidAmount += expense.paidAmount;
-        if (expense.status === 'pending') acc[expense.category].pendingCount++;
-        if (expense.status === 'overdue') acc[expense.category].overdueCount++;
-        acc[expense.category].count++;
-        return acc;
-    }, {} as Record<string, CategoryStats>) || {};
+    // Calculate category stats - with error handling
+    let categoryStats: Record<string, CategoryStats> = {};
+    try {
+        categoryStats = (expenses || []).reduce((acc, expense) => {
+            if (!expense || !expense.category) return acc;
+            if (!acc[expense.category]) {
+                acc[expense.category] = {
+                    totalAmount: 0,
+                    paidAmount: 0,
+                    pendingCount: 0,
+                    overdueCount: 0,
+                    count: 0,
+                };
+            }
+            acc[expense.category].totalAmount += expense.amount || 0;
+            acc[expense.category].paidAmount += expense.paidAmount || 0;
+            if (expense.status === 'pending') acc[expense.category].pendingCount++;
+            if (expense.status === 'overdue') acc[expense.category].overdueCount++;
+            acc[expense.category].count++;
+            return acc;
+        }, {} as Record<string, CategoryStats>);
+    } catch (err) {
+        console.error('Error calculating category stats:', err);
+        // Continue with empty stats
+    }
 
-    const filteredExpenses = expenses?.filter((expense) => {
-        const matchesSearch = expense.title.toLowerCase().includes(searchQuery.toLowerCase());
-        const matchesStatus = statusFilter === "all" || expense.status === statusFilter;
-        const matchesCategory = categoryFilter === "all" || expense.category === categoryFilter;
-        return matchesSearch && matchesStatus && matchesCategory;
-    });
+    // Filter expenses - with error handling
+    let filteredExpenses: ExpenseWithProperty[] = [];
+    try {
+        filteredExpenses = (expenses || []).filter((expense) => {
+            if (!expense || !expense.title) return false;
+            const matchesSearch = expense.title.toLowerCase().includes(searchQuery.toLowerCase());
+            const matchesStatus = statusFilter === "all" || expense.status === statusFilter;
+            const matchesCategory = categoryFilter === "all" || expense.category === categoryFilter;
+            return matchesSearch && matchesStatus && matchesCategory;
+        });
+    } catch (err) {
+        console.error('Error filtering expenses:', err);
+        // Continue with empty array
+    }
 
-    // Calculate metrics
-    const totalExpenses = expenses?.reduce((sum, e) => sum + e.paidAmount, 0) || 0;
-    const pendingExpenses = expenses?.filter(e => e.status === "pending").length || 0;
-    const overdueExpenses = expenses?.filter(e => e.status === "overdue").length || 0;
-    const recurringCount = expenses?.filter(e => e.isRecurring).length || 0;
+    // Calculate metrics - with error handling
+    let totalExpenses = 0;
+    let pendingExpenses = 0;
+    let overdueExpenses = 0;
+    let recurringCount = 0;
+    try {
+        totalExpenses = (expenses || []).reduce((sum, e) => sum + (e?.paidAmount || 0), 0);
+        pendingExpenses = (expenses || []).filter(e => e?.status === "pending").length;
+        overdueExpenses = (expenses || []).filter(e => e?.status === "overdue").length;
+        recurringCount = (expenses || []).filter(e => e?.isRecurring).length;
+    } catch (err) {
+        console.error('Error calculating metrics:', err);
+        // Continue with default values
+    }
 
-    return (
-        <ErrorBoundary>
-            <div className="p-6 space-y-6">
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-                <div>
-                    <h1 className="text-3xl font-semibold">Expenses</h1>
-                    <p className="text-muted-foreground mt-1">Track and manage recurring and one-time expenses</p>
-                </div>
-                <div className="flex items-center gap-2">
-                    <Button variant="outline" size="sm" onClick={handleGenerateReport}>
-                        <FileText className="h-4 w-4 mr-2" />
-                        Generate Report
-                    </Button>
-                    <Button onClick={() => setIsNewDialogOpen(true)}>
-                        <Plus className="h-4 w-4 mr-2" />
-                        Add Expense
-                    </Button>
-                </div>
-            </div>
+    // Early return if critical error with diagnostic info
+    if (error && (error as any)?.status === 500) {
+        const errorMessage = error instanceof Error ? error.message : (error as any)?.message || "Unknown error";
+        const hasDiagnostic = diagnostic && typeof diagnostic === 'object';
+        const envInfo = hasDiagnostic ? (diagnostic as any).environment : null;
+        const dbInfo = hasDiagnostic ? (diagnostic as any).database : null;
 
-            {/* Metrics */}
-            <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
-                {[
-                    { title: "Total Paid", value: totalExpenses, sub: "All time", icon: TrendingUp, color: "from-red-500 to-rose-600" },
-                    { title: "Pending", value: pendingExpenses, sub: "Awaiting payment", icon: Clock, color: "from-yellow-400 to-orange-500" },
-                    { title: "Overdue", value: overdueExpenses, sub: "Past due date", icon: AlertCircle, color: "from-red-600 to-red-800" },
-                    { title: "Recurring", value: recurringCount, sub: "Auto-tracked", icon: Repeat, color: "from-blue-500 to-indigo-600" },
-                ].map((metric, i) => (
-                    <div key={i} className="liquid-glass rounded-[2rem] p-6 relative overflow-hidden group">
-                        <div className={`absolute top-0 right-0 w-32 h-32 bg-gradient-to-br ${metric.color} opacity-10 blur-3xl -mr-16 -mt-16 group-hover:opacity-20 transition-opacity`} />
-                        <div className="flex flex-col gap-4">
-                            <div className="flex items-center justify-between">
-                                <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">{metric.title}</p>
-                                <metric.icon className="h-4 w-4 text-muted-foreground opacity-50" />
-                            </div>
-                            <div className="space-y-1">
-                                <h3 className="text-3xl font-black tracking-tight">
-                                    {typeof metric.value === 'number' ?
-                                        (metric.title === 'Total Paid' ? formatCurrency(metric.value, user?.currency ?? undefined) : metric.value)
-                                        : metric.value}
-                                </h3>
-                                <p className="text-[10px] font-medium text-muted-foreground opacity-70">{metric.sub}</p>
-                            </div>
-                        </div>
-                    </div>
-                ))}
-            </div>
-
-            {/* Category Tiles */}
-            {Object.keys(categoryStats).length > 0 && (
-                <div className="space-y-4">
-                    <div className="flex items-center justify-between">
-                        <h2 className="text-lg font-semibold">Expenses by Category</h2>
-                        {categoryFilter !== "all" && (
-                            <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => setCategoryFilter("all")}
-                            >
-                                Clear Filter
-                            </Button>
-                        )}
-                    </div>
-                    <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                        {Object.entries(categoryStats).map(([cat, stats]) => (
-                            <CategoryCard
-                                key={cat}
-                                category={cat}
-                                stats={stats}
-                                isSelected={categoryFilter === cat}
-                                onClick={() => setCategoryFilter(categoryFilter === cat ? "all" : cat)}
-                            />
-                        ))}
-                    </div>
-                </div>
-            )}
-
-            {/* Filters */}
-            <div className="flex flex-col sm:flex-row gap-4">
-                <div className="relative flex-1">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                    <Input
-                        placeholder="Search expenses..."
-                        value={searchQuery}
-                        onChange={(e) => setSearchQuery(e.target.value)}
-                        className="pl-10"
-                    />
-                </div>
-                <Select value={statusFilter} onValueChange={setStatusFilter}>
-                    <SelectTrigger className="w-full sm:w-[180px]">
-                        <SelectValue placeholder="Filter by status" />
-                    </SelectTrigger>
-                    <SelectContent>
-                        <SelectItem value="all">All Statuses</SelectItem>
-                        <SelectItem value="paid">Paid</SelectItem>
-                        <SelectItem value="pending">Pending</SelectItem>
-                        <SelectItem value="overdue">Overdue</SelectItem>
-                    </SelectContent>
-                </Select>
-            </div>
-
-            {/* Expenses Table */}
-            {categoryFilter !== "all" && (
-                <Alert>
-                    <LayoutGrid className="h-4 w-4" />
-                    <AlertTitle>Filtered by Category</AlertTitle>
-                    <AlertDescription>
-                        Showing only <strong className="capitalize">{categoryFilter}</strong> expenses. Click the category tile again or use the "Clear Filter" button to show all.
-                    </AlertDescription>
-                </Alert>
-            )}
-
-            {/* Expenses Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-                {isLoading ? (
-                    Array.from({ length: 8 }).map((_, i) => (
-                        <div key={i} className="glass-card rounded-[2rem] p-6 space-y-4 h-[280px]">
-                            <Skeleton className="h-12 w-12 rounded-2xl" />
-                            <div className="space-y-2">
-                                <Skeleton className="h-6 w-3/4" />
-                                <Skeleton className="h-4 w-1/2" />
-                            </div>
-                            <div className="mt-auto pt-8 flex justify-between items-end">
-                                <div className="space-y-2">
-                                    <Skeleton className="h-3 w-16" />
-                                    <Skeleton className="h-6 w-24" />
-                                </div>
-                                <Skeleton className="h-10 w-20 rounded-2xl" />
-                            </div>
-                        </div>
-                    ))
-                ) : filteredExpenses && filteredExpenses.length > 0 ? (
-                    filteredExpenses.map((expense) => (
-                        <ExpenseTile
-                            key={expense.id}
-                            expense={expense}
-                            onView={() => setViewingExpense(expense)}
-                            onRecord={() => setSelectedExpense(expense)}
-                        />
-                    ))
-                ) : error ? (
+        return (
+            <ErrorBoundary>
+                <div className="p-6 space-y-6">
                     <div className="col-span-full py-20 flex flex-col items-center justify-center glass-card rounded-[3rem]">
                         <div className="h-20 w-20 rounded-full bg-destructive/10 flex items-center justify-center mb-6">
                             <AlertCircle className="h-10 w-10 text-destructive" />
                         </div>
-                        <h3 className="text-2xl font-bold mb-2">Failed to load expenses</h3>
+                        <h3 className="text-2xl font-bold mb-2">Server Error</h3>
                         <p className="text-muted-foreground text-center max-w-sm mb-4">
-                            {error instanceof Error ? error.message : "Unable to load expenses. Please try again."}
+                            {errorMessage}
                         </p>
-                        <Button
-                            variant="outline"
-                            className="mt-4"
-                            onClick={() => {
-                                queryClient.invalidateQueries({ queryKey: ["/api/expenses"] });
-                            }}
-                        >
-                            <Repeat className="h-4 w-4 mr-2" />
-                            Retry
-                        </Button>
-                    </div>
-                ) : (
-                    <div className="col-span-full py-20 flex flex-col items-center justify-center glass-card rounded-[3rem]">
-                        <div className="h-20 w-20 rounded-full bg-muted flex items-center justify-center mb-6">
-                            <Zap className="h-10 w-10 text-muted-foreground/50" />
+                        {hasDiagnostic && (
+                            <div className="mt-4 p-4 bg-muted rounded-lg max-w-md text-sm space-y-2">
+                                <p className="font-semibold">Diagnostic Information:</p>
+                                {envInfo && (
+                                    <div className="space-y-1">
+                                        <p>Environment Variables:</p>
+                                        <ul className="list-disc list-inside ml-2">
+                                            <li>DATABASE_URL: {envInfo.hasDatabaseUrl ? '✓ Set' : '✗ Missing'}</li>
+                                            <li>SUPABASE_URL: {envInfo.hasSupabaseUrl ? '✓ Set' : '✗ Missing'}</li>
+                                            <li>SUPABASE_KEY: {envInfo.hasSupabaseKey ? '✓ Set' : '✗ Missing'}</li>
+                                        </ul>
+                                    </div>
+                                )}
+                                {dbInfo && (
+                                    <div className="mt-2">
+                                        <p>Database: {dbInfo.connected ? '✓ Connected' : '✗ Not Connected'}</p>
+                                        {dbInfo.error && (
+                                            <p className="text-destructive text-xs mt-1">{dbInfo.error}</p>
+                                        )}
+                                    </div>
+                                )}
+                            </div>
+                        )}
+                        <div className="flex gap-2 mt-4">
+                            <Button
+                                variant="outline"
+                                onClick={() => {
+                                    queryClient.invalidateQueries({ queryKey: ["/api/expenses"] });
+                                    queryClient.invalidateQueries({ queryKey: ["/api/diagnostic"] });
+                                }}
+                            >
+                                <Repeat className="h-4 w-4 mr-2" />
+                                Retry
+                            </Button>
+                            <Button
+                                variant="outline"
+                                onClick={() => {
+                                    window.location.reload();
+                                }}
+                            >
+                                Reload Page
+                            </Button>
                         </div>
-                        <h3 className="text-2xl font-bold mb-2">No expenses found</h3>
-                        <p className="text-muted-foreground text-center max-w-sm">
-                            {searchQuery || statusFilter !== "all" || categoryFilter !== "all"
-                                ? "Try adjusting your search or filters to find what you're looking for."
-                                : "Start tracking your business spend by adding your first expense today."}
-                        </p>
-                        <Button
-                            variant="link"
-                            className="mt-4 font-bold text-primary"
-                            onClick={() => setIsNewDialogOpen(true)}
-                        >
-                            Add your first expense
+                    </div>
+                </div>
+            </ErrorBoundary>
+        );
+    }
+
+    return (
+        <ErrorBoundary>
+            <div className="p-6 space-y-6">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                    <div>
+                        <h1 className="text-3xl font-semibold">Expenses</h1>
+                        <p className="text-muted-foreground mt-1">Track and manage recurring and one-time expenses</p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                        <Button variant="outline" size="sm" onClick={handleGenerateReport}>
+                            <FileText className="h-4 w-4 mr-2" />
+                            Generate Report
+                        </Button>
+                        <Button onClick={() => setIsNewDialogOpen(true)}>
+                            <Plus className="h-4 w-4 mr-2" />
+                            Add Expense
                         </Button>
                     </div>
-                )}
-            </div>
+                </div>
 
-            {/* Create Expense Dialog */}
-            <Dialog open={isNewDialogOpen} onOpenChange={setIsNewDialogOpen}>
-                <DialogContent className="max-w-2xl p-0 overflow-hidden border-none bg-transparent shadow-none">
-                    <div className="liquid-glass rounded-[2.5rem] overflow-hidden flex flex-col h-full max-h-[90vh]">
-                        <div className="p-8 space-y-8 overflow-y-auto">
-                            <div className="flex justify-between items-center">
-                                <h2 className="text-3xl font-black tracking-tight">Add Expense</h2>
+                {/* Metrics */}
+                <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
+                    {[
+                        { title: "Total Paid", value: totalExpenses, sub: "All time", icon: TrendingUp, color: "from-red-500 to-rose-600" },
+                        { title: "Pending", value: pendingExpenses, sub: "Awaiting payment", icon: Clock, color: "from-yellow-400 to-orange-500" },
+                        { title: "Overdue", value: overdueExpenses, sub: "Past due date", icon: AlertCircle, color: "from-red-600 to-red-800" },
+                        { title: "Recurring", value: recurringCount, sub: "Auto-tracked", icon: Repeat, color: "from-blue-500 to-indigo-600" },
+                    ].map((metric, i) => (
+                        <div key={i} className="liquid-glass rounded-[2rem] p-6 relative overflow-hidden group">
+                            <div className={`absolute top-0 right-0 w-32 h-32 bg-gradient-to-br ${metric.color} opacity-10 blur-3xl -mr-16 -mt-16 group-hover:opacity-20 transition-opacity`} />
+                            <div className="flex flex-col gap-4">
+                                <div className="flex items-center justify-between">
+                                    <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">{metric.title}</p>
+                                    <metric.icon className="h-4 w-4 text-muted-foreground opacity-50" />
+                                </div>
+                                <div className="space-y-1">
+                                    <h3 className="text-3xl font-black tracking-tight">
+                                        {typeof metric.value === 'number' ?
+                                            (metric.title === 'Total Paid' ? formatCurrency(metric.value, user?.currency ?? undefined) : metric.value)
+                                            : metric.value}
+                                    </h3>
+                                    <p className="text-[10px] font-medium text-muted-foreground opacity-70">{metric.sub}</p>
+                                </div>
+                            </div>
+                        </div>
+                    ))}
+                </div>
+
+                {/* Category Tiles */}
+                {Object.keys(categoryStats).length > 0 && (
+                    <div className="space-y-4">
+                        <div className="flex items-center justify-between">
+                            <h2 className="text-lg font-semibold">Expenses by Category</h2>
+                            {categoryFilter !== "all" && (
                                 <Button
                                     variant="ghost"
-                                    size="icon"
-                                    className="rounded-full hover:bg-white/10"
-                                    onClick={() => { setIsNewDialogOpen(false); resetForm(); }}
+                                    size="sm"
+                                    onClick={() => setCategoryFilter("all")}
                                 >
-                                    <Plus className="h-6 w-6 rotate-45" />
+                                    Clear Filter
                                 </Button>
-                            </div>
-
-                            <div className="grid grid-cols-2 gap-6">
-                                <div className="space-y-2 col-span-2">
-                                    <Label className="text-[10px] font-bold uppercase tracking-widest px-1">Title *</Label>
-                                    <Input
-                                        className="rounded-2xl bg-white/5 border-white/10 h-12"
-                                        placeholder="e.g., KPLC - Main Building"
-                                        value={title}
-                                        onChange={(e) => setTitle(e.target.value)}
-                                    />
-                                </div>
-                                <div className="space-y-2">
-                                    <Label className="text-[10px] font-bold uppercase tracking-widest px-1">Category *</Label>
-                                    <Select value={category} onValueChange={setCategory}>
-                                        <SelectTrigger className="rounded-2xl bg-white/5 border-white/10 h-12">
-                                            <SelectValue />
-                                        </SelectTrigger>
-                                        <SelectContent className="rounded-2xl border-white/10 liquid-glass">
-                                            <SelectItem value="electricity">Electricity</SelectItem>
-                                            <SelectItem value="water">Water</SelectItem>
-                                            <SelectItem value="maintenance">Maintenance</SelectItem>
-                                            <SelectItem value="insurance">Insurance</SelectItem>
-                                            <SelectItem value="tax">Tax</SelectItem>
-                                            <SelectItem value="other">Other</SelectItem>
-                                        </SelectContent>
-                                    </Select>
-                                </div>
-                                <div className="space-y-2">
-                                    <Label className="text-[10px] font-bold uppercase tracking-widest px-1">Property</Label>
-                                    <Select value={propertyId} onValueChange={setPropertyId}>
-                                        <SelectTrigger className="rounded-2xl bg-white/5 border-white/10 h-12">
-                                            <SelectValue placeholder="General expense" />
-                                        </SelectTrigger>
-                                        <SelectContent className="rounded-2xl border-white/10 liquid-glass text-foreground">
-                                            <SelectItem value="">General</SelectItem>
-                                            {properties?.map(prop => (
-                                                <SelectItem key={prop.id} value={prop.id}>{prop.name}</SelectItem>
-                                            ))}
-                                        </SelectContent>
-                                    </Select>
-                                </div>
-                                <div className="space-y-2">
-                                    <Label className="text-[10px] font-bold uppercase tracking-widest px-1">Amount ({user?.currency || "KES"}) *</Label>
-                                    <Input
-                                        className="rounded-2xl bg-white/5 border-white/10 h-12"
-                                        type="number"
-                                        placeholder="0.00"
-                                        value={amount}
-                                        onChange={(e) => setAmount(e.target.value)}
-                                    />
-                                </div>
-                                <div className="space-y-2">
-                                    <Label className="text-[10px] font-bold uppercase tracking-widest px-1">Due Date *</Label>
-                                    <Input
-                                        className="rounded-2xl bg-white/5 border-white/10 h-12"
-                                        type="date"
-                                        value={dueDate}
-                                        onChange={(e) => setDueDate(e.target.value)}
-                                    />
-                                </div>
-
-                                <div className="col-span-2 p-4 bg-white/5 rounded-[2rem] border border-white/10 space-y-4">
-                                    <div className="flex items-center justify-between px-2">
-                                        <div className="flex items-center gap-3">
-                                            <div className="h-10 w-10 rounded-xl bg-blue-500/20 flex items-center justify-center">
-                                                <Repeat className={`h-5 w-5 ${isRecurring ? 'text-blue-500' : 'text-blue-500/50'}`} />
-                                            </div>
-                                            <div>
-                                                <p className="text-sm font-bold">Recurring Expense</p>
-                                                <p className="text-[10px] text-muted-foreground tracking-tight">Toggle for monthly/annual payments</p>
-                                            </div>
-                                        </div>
-                                        <button
-                                            role="switch"
-                                            aria-checked={isRecurring}
-                                            onClick={() => setIsRecurring(!isRecurring)}
-                                            className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${isRecurring ? 'bg-primary' : 'bg-white/10'}`}
-                                        >
-                                            <span className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${isRecurring ? 'translate-x-5' : 'translate-x-0'}`} />
-                                        </button>
-                                    </div>
-
-                                    {isRecurring && (
-                                        <div className="pt-2 animate-in fade-in slide-in-from-top-2 duration-300">
-                                            <Label className="text-[10px] font-bold uppercase tracking-widest px-3 mb-2 block">Frequency</Label>
-                                            <div className="flex gap-2">
-                                                {['monthly', 'quarterly', 'annually'].map((freq) => (
-                                                    <Button
-                                                        key={freq}
-                                                        variant="ghost"
-                                                        size="sm"
-                                                        className={`flex-1 rounded-xl h-9 capitalize text-xs font-bold ${frequency === freq ? 'bg-primary text-white hover:bg-primary' : 'bg-white/5 hover:bg-white/10'}`}
-                                                        onClick={() => setFrequency(freq)}
-                                                    >
-                                                        {freq}
-                                                    </Button>
-                                                ))}
-                                            </div>
-                                        </div>
-                                    )}
-                                </div>
-
-                                <div className="space-y-2 col-span-2">
-                                    <Label className="text-[10px] font-bold uppercase tracking-widest px-1">Notes</Label>
-                                    <Textarea
-                                        className="rounded-2xl bg-white/5 border-white/10 min-h-[100px] resize-none"
-                                        placeholder="Add any additional details..."
-                                        value={notes}
-                                        onChange={(e) => setNotes(e.target.value)}
-                                    />
-                                </div>
-                            </div>
-
-                            <div className="flex gap-4">
-                                <Button
-                                    variant="outline"
-                                    className="flex-1 rounded-[1.5rem] h-14 font-bold border-white/10 hover:bg-white/5"
-                                    onClick={() => { setIsNewDialogOpen(false); resetForm(); }}
-                                >
-                                    Cancel
-                                </Button>
-                                <Button
-                                    className="flex-[2] rounded-[1.5rem] h-14 font-black text-lg shadow-xl shadow-primary/20"
-                                    onClick={handleCreateExpense}
-                                    disabled={createExpenseMutation.isPending}
-                                >
-                                    {createExpenseMutation.isPending && <Loader2 className="mr-2 h-5 w-5 animate-spin" />}
-                                    {createExpenseMutation.isPending ? "Creating..." : "Save Expense"}
-                                </Button>
-                            </div>
+                            )}
+                        </div>
+                        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                            {Object.entries(categoryStats).map(([cat, stats]) => (
+                                <CategoryCard
+                                    key={cat}
+                                    category={cat}
+                                    stats={stats}
+                                    isSelected={categoryFilter === cat}
+                                    onClick={() => setCategoryFilter(categoryFilter === cat ? "all" : cat)}
+                                />
+                            ))}
                         </div>
                     </div>
-                </DialogContent>
-            </Dialog>
+                )}
 
-            {/* Record Payment Dialog */}
-            <Dialog open={!!selectedExpense} onOpenChange={() => setSelectedExpense(null)}>
-                <DialogContent className="max-w-md p-0 overflow-hidden border-none bg-transparent shadow-none">
-                    <div className="liquid-glass rounded-[2.5rem] overflow-hidden flex flex-col h-full max-h-[90vh]">
-                        {selectedExpense && (
-                            <div className="p-8 space-y-8">
-                                <div className="flex justify-between items-center">
-                                    <div className="space-y-1">
-                                        <h2 className="text-3xl font-black tracking-tight">Pay Expense</h2>
-                                        <p className="text-xs text-muted-foreground opacity-70">{selectedExpense.title}</p>
+                {/* Filters */}
+                <div className="flex flex-col sm:flex-row gap-4">
+                    <div className="relative flex-1">
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                        <Input
+                            placeholder="Search expenses..."
+                            value={searchQuery}
+                            onChange={(e) => setSearchQuery(e.target.value)}
+                            className="pl-10"
+                        />
+                    </div>
+                    <Select value={statusFilter} onValueChange={setStatusFilter}>
+                        <SelectTrigger className="w-full sm:w-[180px]">
+                            <SelectValue placeholder="Filter by status" />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="all">All Statuses</SelectItem>
+                            <SelectItem value="paid">Paid</SelectItem>
+                            <SelectItem value="pending">Pending</SelectItem>
+                            <SelectItem value="overdue">Overdue</SelectItem>
+                        </SelectContent>
+                    </Select>
+                </div>
+
+                {/* Expenses Table */}
+                {categoryFilter !== "all" && (
+                    <Alert>
+                        <LayoutGrid className="h-4 w-4" />
+                        <AlertTitle>Filtered by Category</AlertTitle>
+                        <AlertDescription>
+                            Showing only <strong className="capitalize">{categoryFilter}</strong> expenses. Click the category tile again or use the "Clear Filter" button to show all.
+                        </AlertDescription>
+                    </Alert>
+                )}
+
+                {/* Expenses Grid */}
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                    {isLoading ? (
+                        Array.from({ length: 8 }).map((_, i) => (
+                            <div key={i} className="glass-card rounded-[2rem] p-6 space-y-4 h-[280px]">
+                                <Skeleton className="h-12 w-12 rounded-2xl" />
+                                <div className="space-y-2">
+                                    <Skeleton className="h-6 w-3/4" />
+                                    <Skeleton className="h-4 w-1/2" />
+                                </div>
+                                <div className="mt-auto pt-8 flex justify-between items-end">
+                                    <div className="space-y-2">
+                                        <Skeleton className="h-3 w-16" />
+                                        <Skeleton className="h-6 w-24" />
                                     </div>
+                                    <Skeleton className="h-10 w-20 rounded-2xl" />
+                                </div>
+                            </div>
+                        ))
+                    ) : filteredExpenses && filteredExpenses.length > 0 ? (
+                        filteredExpenses.map((expense) => (
+                            <ExpenseTile
+                                key={expense.id}
+                                expense={expense}
+                                onView={() => setViewingExpense(expense)}
+                                onRecord={() => setSelectedExpense(expense)}
+                            />
+                        ))
+                    ) : error ? (
+                        <div className="col-span-full py-20 flex flex-col items-center justify-center glass-card rounded-[3rem]">
+                            <div className="h-20 w-20 rounded-full bg-destructive/10 flex items-center justify-center mb-6">
+                                <AlertCircle className="h-10 w-10 text-destructive" />
+                            </div>
+                            <h3 className="text-2xl font-bold mb-2">Failed to load expenses</h3>
+                            <p className="text-muted-foreground text-center max-w-sm mb-4">
+                                {error instanceof Error ? error.message : (error as any)?.message || "Unable to load expenses. Please check your connection and try again."}
+                            </p>
+                            {(error as any)?.status === 500 && (
+                                <p className="text-sm text-muted-foreground text-center max-w-sm mb-4">
+                                    Server error detected. This may be due to missing environment variables or database connection issues.
+                                </p>
+                            )}
+                            <Button
+                                variant="outline"
+                                className="mt-4"
+                                onClick={() => {
+                                    queryClient.invalidateQueries({ queryKey: ["/api/expenses"] });
+                                }}
+                            >
+                                <Repeat className="h-4 w-4 mr-2" />
+                                Retry
+                            </Button>
+                        </div>
+                    ) : (
+                        <div className="col-span-full py-20 flex flex-col items-center justify-center glass-card rounded-[3rem]">
+                            <div className="h-20 w-20 rounded-full bg-muted flex items-center justify-center mb-6">
+                                <Zap className="h-10 w-10 text-muted-foreground/50" />
+                            </div>
+                            <h3 className="text-2xl font-bold mb-2">No expenses found</h3>
+                            <p className="text-muted-foreground text-center max-w-sm">
+                                {searchQuery || statusFilter !== "all" || categoryFilter !== "all"
+                                    ? "Try adjusting your search or filters to find what you're looking for."
+                                    : "Start tracking your business spend by adding your first expense today."}
+                            </p>
+                            <Button
+                                variant="link"
+                                className="mt-4 font-bold text-primary"
+                                onClick={() => setIsNewDialogOpen(true)}
+                            >
+                                Add your first expense
+                            </Button>
+                        </div>
+                    )}
+                </div>
+
+                {/* Create Expense Dialog */}
+                <Dialog open={isNewDialogOpen} onOpenChange={setIsNewDialogOpen}>
+                    <DialogContent className="max-w-2xl p-0 overflow-hidden border-none bg-transparent shadow-none">
+                        <div className="liquid-glass rounded-[2.5rem] overflow-hidden flex flex-col h-full max-h-[90vh]">
+                            <div className="p-8 space-y-8 overflow-y-auto">
+                                <div className="flex justify-between items-center">
+                                    <h2 className="text-3xl font-black tracking-tight">Add Expense</h2>
                                     <Button
                                         variant="ghost"
                                         size="icon"
                                         className="rounded-full hover:bg-white/10"
-                                        onClick={() => setSelectedExpense(null)}
+                                        onClick={() => { setIsNewDialogOpen(false); resetForm(); }}
                                     >
                                         <Plus className="h-6 w-6 rotate-45" />
                                     </Button>
                                 </div>
 
-                                <div className="bg-white/5 rounded-3xl p-6 border border-white/10 space-y-4">
-                                    <div className="flex justify-between items-end">
-                                        <div>
-                                            <p className="text-[10px] font-bold text-muted-foreground uppercase mb-1">Remaining Balance</p>
-                                            <p className="text-3xl font-black text-red-500">{formatCurrency(selectedExpense.amount - selectedExpense.paidAmount, user?.currency ?? undefined)}</p>
-                                        </div>
-                                        <div className="text-right">
-                                            <p className="text-[10px] font-bold text-muted-foreground uppercase mb-1">Total</p>
-                                            <p className="text-sm font-bold opacity-60">{formatCurrency(selectedExpense.amount, user?.currency ?? undefined)}</p>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <div className="space-y-6">
-                                    <div className="space-y-2">
-                                        <Label className="text-[10px] font-bold uppercase tracking-widest px-1">Amount to Pay ({user?.currency || "KES"}) *</Label>
+                                <div className="grid grid-cols-2 gap-6">
+                                    <div className="space-y-2 col-span-2">
+                                        <Label className="text-[10px] font-bold uppercase tracking-widest px-1">Title *</Label>
                                         <Input
-                                            className="rounded-2xl bg-white/5 border-white/10 h-14 text-xl font-bold"
+                                            className="rounded-2xl bg-white/5 border-white/10 h-12"
+                                            placeholder="e.g., KPLC - Main Building"
+                                            value={title}
+                                            onChange={(e) => setTitle(e.target.value)}
+                                        />
+                                    </div>
+                                    <div className="space-y-2">
+                                        <Label className="text-[10px] font-bold uppercase tracking-widest px-1">Category *</Label>
+                                        <Select value={category} onValueChange={setCategory}>
+                                            <SelectTrigger className="rounded-2xl bg-white/5 border-white/10 h-12">
+                                                <SelectValue />
+                                            </SelectTrigger>
+                                            <SelectContent className="rounded-2xl border-white/10 liquid-glass">
+                                                <SelectItem value="electricity">Electricity</SelectItem>
+                                                <SelectItem value="water">Water</SelectItem>
+                                                <SelectItem value="maintenance">Maintenance</SelectItem>
+                                                <SelectItem value="insurance">Insurance</SelectItem>
+                                                <SelectItem value="tax">Tax</SelectItem>
+                                                <SelectItem value="other">Other</SelectItem>
+                                            </SelectContent>
+                                        </Select>
+                                    </div>
+                                    <div className="space-y-2">
+                                        <Label className="text-[10px] font-bold uppercase tracking-widest px-1">Property</Label>
+                                        <Select value={propertyId} onValueChange={setPropertyId}>
+                                            <SelectTrigger className="rounded-2xl bg-white/5 border-white/10 h-12">
+                                                <SelectValue placeholder="General expense" />
+                                            </SelectTrigger>
+                                            <SelectContent className="rounded-2xl border-white/10 liquid-glass text-foreground">
+                                                <SelectItem value="general">General</SelectItem>
+                                                {properties?.map(prop => (
+                                                    <SelectItem key={prop.id} value={prop.id}>{prop.name}</SelectItem>
+                                                ))}
+                                            </SelectContent>
+                                        </Select>
+                                    </div>
+                                    <div className="space-y-2">
+                                        <Label className="text-[10px] font-bold uppercase tracking-widest px-1">Amount ({user?.currency || "KES"}) *</Label>
+                                        <Input
+                                            className="rounded-2xl bg-white/5 border-white/10 h-12"
                                             type="number"
                                             placeholder="0.00"
-                                            value={paidAmount}
-                                            onChange={(e) => setPaidAmount(e.target.value)}
+                                            value={amount}
+                                            onChange={(e) => setAmount(e.target.value)}
+                                        />
+                                    </div>
+                                    <div className="space-y-2">
+                                        <Label className="text-[10px] font-bold uppercase tracking-widest px-1">Due Date *</Label>
+                                        <Input
+                                            className="rounded-2xl bg-white/5 border-white/10 h-12"
+                                            type="date"
+                                            value={dueDate}
+                                            onChange={(e) => setDueDate(e.target.value)}
                                         />
                                     </div>
 
-                                    <div className="grid grid-cols-2 gap-4">
-                                        <div className="space-y-2">
-                                            <Label className="text-[10px] font-bold uppercase tracking-widest px-1">Method</Label>
-                                            <Select value={paymentMethod} onValueChange={setPaymentMethod}>
-                                                <SelectTrigger className="rounded-2xl bg-white/5 border-white/10 h-12">
-                                                    <SelectValue />
-                                                </SelectTrigger>
-                                                <SelectContent className="rounded-2xl border-white/10 liquid-glass">
-                                                    <SelectItem value="m_pesa">M-Pesa</SelectItem>
-                                                    <SelectItem value="bank_transfer">Bank Transfer</SelectItem>
-                                                    <SelectItem value="cash">Cash</SelectItem>
-                                                    <SelectItem value="check">Check</SelectItem>
-                                                </SelectContent>
-                                            </Select>
+                                    <div className="col-span-2 p-4 bg-white/5 rounded-[2rem] border border-white/10 space-y-4">
+                                        <div className="flex items-center justify-between px-2">
+                                            <div className="flex items-center gap-3">
+                                                <div className="h-10 w-10 rounded-xl bg-blue-500/20 flex items-center justify-center">
+                                                    <Repeat className={`h-5 w-5 ${isRecurring ? 'text-blue-500' : 'text-blue-500/50'}`} />
+                                                </div>
+                                                <div>
+                                                    <p className="text-sm font-bold">Recurring Expense</p>
+                                                    <p className="text-[10px] text-muted-foreground tracking-tight">Toggle for monthly/annual payments</p>
+                                                </div>
+                                            </div>
+                                            <button
+                                                role="switch"
+                                                aria-checked={isRecurring}
+                                                onClick={() => setIsRecurring(!isRecurring)}
+                                                className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${isRecurring ? 'bg-primary' : 'bg-white/10'}`}
+                                            >
+                                                <span className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${isRecurring ? 'translate-x-5' : 'translate-x-0'}`} />
+                                            </button>
                                         </div>
-                                        <div className="space-y-2">
-                                            <Label className="text-[10px] font-bold uppercase tracking-widest px-1">Reference</Label>
-                                            <Input
-                                                className="rounded-2xl bg-white/5 border-white/10 h-12"
-                                                placeholder="TXN ID..."
-                                                value={reference}
-                                                onChange={(e) => setReference(e.target.value)}
-                                            />
-                                        </div>
+
+                                        {isRecurring && (
+                                            <div className="pt-2 animate-in fade-in slide-in-from-top-2 duration-300">
+                                                <Label className="text-[10px] font-bold uppercase tracking-widest px-3 mb-2 block">Frequency</Label>
+                                                <div className="flex gap-2">
+                                                    {['monthly', 'quarterly', 'annually'].map((freq) => (
+                                                        <Button
+                                                            key={freq}
+                                                            variant="ghost"
+                                                            size="sm"
+                                                            className={`flex-1 rounded-xl h-9 capitalize text-xs font-bold ${frequency === freq ? 'bg-primary text-white hover:bg-primary' : 'bg-white/5 hover:bg-white/10'}`}
+                                                            onClick={() => setFrequency(freq)}
+                                                        >
+                                                            {freq}
+                                                        </Button>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        )}
                                     </div>
 
-                                    <div className="space-y-2">
-                                        <Label className="text-[10px] font-bold uppercase tracking-widest px-1">Payment Notes</Label>
+                                    <div className="space-y-2 col-span-2">
+                                        <Label className="text-[10px] font-bold uppercase tracking-widest px-1">Notes</Label>
                                         <Textarea
-                                            className="rounded-2xl bg-white/5 border-white/10 min-h-[80px] resize-none"
-                                            placeholder="Optional notes..."
-                                            value={paymentNotes}
-                                            onChange={(e) => setPaymentNotes(e.target.value)}
+                                            className="rounded-2xl bg-white/5 border-white/10 min-h-[100px] resize-none"
+                                            placeholder="Add any additional details..."
+                                            value={notes}
+                                            onChange={(e) => setNotes(e.target.value)}
                                         />
                                     </div>
                                 </div>
@@ -912,124 +938,229 @@ export default function Expenses() {
                                     <Button
                                         variant="outline"
                                         className="flex-1 rounded-[1.5rem] h-14 font-bold border-white/10 hover:bg-white/5"
-                                        onClick={() => setSelectedExpense(null)}
+                                        onClick={() => { setIsNewDialogOpen(false); resetForm(); }}
                                     >
                                         Cancel
                                     </Button>
                                     <Button
                                         className="flex-[2] rounded-[1.5rem] h-14 font-black text-lg shadow-xl shadow-primary/20"
-                                        onClick={() => recordPaymentMutation.mutate(selectedExpense.id)}
-                                        disabled={recordPaymentMutation.isPending || !paidAmount}
+                                        onClick={handleCreateExpense}
+                                        disabled={createExpenseMutation.isPending}
                                     >
-                                        {recordPaymentMutation.isPending && <Loader2 className="mr-2 h-5 w-5 animate-spin" />}
-                                        {recordPaymentMutation.isPending ? "Confirming..." : "Confirm Payment"}
+                                        {createExpenseMutation.isPending && <Loader2 className="mr-2 h-5 w-5 animate-spin" />}
+                                        {createExpenseMutation.isPending ? "Creating..." : "Save Expense"}
                                     </Button>
                                 </div>
                             </div>
-                        )}
-                    </div>
-                </DialogContent>
-            </Dialog>
+                        </div>
+                    </DialogContent>
+                </Dialog>
 
-            {/* View Details Dialog */}
-            <Dialog open={!!viewingExpense} onOpenChange={() => setViewingExpense(null)}>
-                <DialogContent className="max-w-md">
-                    <DialogHeader>
-                        <DialogTitle>Expense Details</DialogTitle>
-                    </DialogHeader>
-                    {viewingExpense && (
-                        <div className="space-y-6">
-                            <div className="p-4 bg-muted rounded-md space-y-4">
-                                <div className="flex justify-between items-center text-sm">
-                                    <span className="text-muted-foreground">Title</span>
-                                    <span className="font-semibold">{viewingExpense.title}</span>
+                {/* Record Payment Dialog */}
+                <Dialog open={!!selectedExpense} onOpenChange={() => setSelectedExpense(null)}>
+                    <DialogContent className="max-w-md p-0 overflow-hidden border-none bg-transparent shadow-none">
+                        <div className="liquid-glass rounded-[2.5rem] overflow-hidden flex flex-col h-full max-h-[90vh]">
+                            {selectedExpense && (
+                                <div className="p-8 space-y-8">
+                                    <div className="flex justify-between items-center">
+                                        <div className="space-y-1">
+                                            <h2 className="text-3xl font-black tracking-tight">Pay Expense</h2>
+                                            <p className="text-xs text-muted-foreground opacity-70">{selectedExpense.title}</p>
+                                        </div>
+                                        <Button
+                                            variant="ghost"
+                                            size="icon"
+                                            className="rounded-full hover:bg-white/10"
+                                            onClick={() => setSelectedExpense(null)}
+                                        >
+                                            <Plus className="h-6 w-6 rotate-45" />
+                                        </Button>
+                                    </div>
+
+                                    <div className="bg-white/5 rounded-3xl p-6 border border-white/10 space-y-4">
+                                        <div className="flex justify-between items-end">
+                                            <div>
+                                                <p className="text-[10px] font-bold text-muted-foreground uppercase mb-1">Remaining Balance</p>
+                                                <p className="text-3xl font-black text-red-500">{formatCurrency(selectedExpense.amount - selectedExpense.paidAmount, user?.currency ?? undefined)}</p>
+                                            </div>
+                                            <div className="text-right">
+                                                <p className="text-[10px] font-bold text-muted-foreground uppercase mb-1">Total</p>
+                                                <p className="text-sm font-bold opacity-60">{formatCurrency(selectedExpense.amount, user?.currency ?? undefined)}</p>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div className="space-y-6">
+                                        <div className="space-y-2">
+                                            <Label className="text-[10px] font-bold uppercase tracking-widest px-1">Amount to Pay ({user?.currency || "KES"}) *</Label>
+                                            <Input
+                                                className="rounded-2xl bg-white/5 border-white/10 h-14 text-xl font-bold"
+                                                type="number"
+                                                placeholder="0.00"
+                                                value={paidAmount}
+                                                onChange={(e) => setPaidAmount(e.target.value)}
+                                            />
+                                        </div>
+
+                                        <div className="grid grid-cols-2 gap-4">
+                                            <div className="space-y-2">
+                                                <Label className="text-[10px] font-bold uppercase tracking-widest px-1">Method</Label>
+                                                <Select value={paymentMethod} onValueChange={setPaymentMethod}>
+                                                    <SelectTrigger className="rounded-2xl bg-white/5 border-white/10 h-12">
+                                                        <SelectValue />
+                                                    </SelectTrigger>
+                                                    <SelectContent className="rounded-2xl border-white/10 liquid-glass">
+                                                        <SelectItem value="m_pesa">M-Pesa</SelectItem>
+                                                        <SelectItem value="bank_transfer">Bank Transfer</SelectItem>
+                                                        <SelectItem value="cash">Cash</SelectItem>
+                                                        <SelectItem value="check">Check</SelectItem>
+                                                    </SelectContent>
+                                                </Select>
+                                            </div>
+                                            <div className="space-y-2">
+                                                <Label className="text-[10px] font-bold uppercase tracking-widest px-1">Reference</Label>
+                                                <Input
+                                                    className="rounded-2xl bg-white/5 border-white/10 h-12"
+                                                    placeholder="TXN ID..."
+                                                    value={reference}
+                                                    onChange={(e) => setReference(e.target.value)}
+                                                />
+                                            </div>
+                                        </div>
+
+                                        <div className="space-y-2">
+                                            <Label className="text-[10px] font-bold uppercase tracking-widest px-1">Payment Notes</Label>
+                                            <Textarea
+                                                className="rounded-2xl bg-white/5 border-white/10 min-h-[80px] resize-none"
+                                                placeholder="Optional notes..."
+                                                value={paymentNotes}
+                                                onChange={(e) => setPaymentNotes(e.target.value)}
+                                            />
+                                        </div>
+                                    </div>
+
+                                    <div className="flex gap-4">
+                                        <Button
+                                            variant="outline"
+                                            className="flex-1 rounded-[1.5rem] h-14 font-bold border-white/10 hover:bg-white/5"
+                                            onClick={() => setSelectedExpense(null)}
+                                        >
+                                            Cancel
+                                        </Button>
+                                        <Button
+                                            className="flex-[2] rounded-[1.5rem] h-14 font-black text-lg shadow-xl shadow-primary/20"
+                                            onClick={() => recordPaymentMutation.mutate(selectedExpense.id)}
+                                            disabled={recordPaymentMutation.isPending || !paidAmount}
+                                        >
+                                            {recordPaymentMutation.isPending && <Loader2 className="mr-2 h-5 w-5 animate-spin" />}
+                                            {recordPaymentMutation.isPending ? "Confirming..." : "Confirm Payment"}
+                                        </Button>
+                                    </div>
                                 </div>
-                                <div className="flex justify-between items-center text-sm">
-                                    <span className="text-muted-foreground">Category</span>
-                                    <CategoryBadge category={viewingExpense.category} />
-                                </div>
-                                {viewingExpense.propertyName && (
+                            )}
+                        </div>
+                    </DialogContent>
+                </Dialog>
+
+                {/* View Details Dialog */}
+                <Dialog open={!!viewingExpense} onOpenChange={() => setViewingExpense(null)}>
+                    <DialogContent className="max-w-md">
+                        <DialogHeader>
+                            <DialogTitle>Expense Details</DialogTitle>
+                        </DialogHeader>
+                        {viewingExpense && (
+                            <div className="space-y-6">
+                                <div className="p-4 bg-muted rounded-md space-y-4">
                                     <div className="flex justify-between items-center text-sm">
-                                        <span className="text-muted-foreground">Property</span>
-                                        <span className="font-semibold">{viewingExpense.propertyName}</span>
+                                        <span className="text-muted-foreground">Title</span>
+                                        <span className="font-semibold">{viewingExpense.title}</span>
                                     </div>
-                                )}
-                                <div className="flex justify-between items-center text-lg border-t pt-2">
-                                    <span className="font-medium text-muted-foreground">Total Amount</span>
-                                    <span className="font-bold">{formatCurrency(viewingExpense.amount, user?.currency ?? undefined)}</span>
+                                    <div className="flex justify-between items-center text-sm">
+                                        <span className="text-muted-foreground">Category</span>
+                                        <CategoryBadge category={viewingExpense.category} />
+                                    </div>
+                                    {viewingExpense.propertyName && (
+                                        <div className="flex justify-between items-center text-sm">
+                                            <span className="text-muted-foreground">Property</span>
+                                            <span className="font-semibold">{viewingExpense.propertyName}</span>
+                                        </div>
+                                    )}
+                                    <div className="flex justify-between items-center text-lg border-t pt-2">
+                                        <span className="font-medium text-muted-foreground">Total Amount</span>
+                                        <span className="font-bold">{formatCurrency(viewingExpense.amount, user?.currency ?? undefined)}</span>
+                                    </div>
+                                    <div className="flex justify-between items-center text-lg">
+                                        <span className="font-medium text-muted-foreground">Amount Paid</span>
+                                        <span className="font-bold text-green-600">{formatCurrency(viewingExpense.paidAmount, user?.currency ?? undefined)}</span>
+                                    </div>
+                                    <div className="flex justify-between items-center text-lg border-t pt-2">
+                                        <span className="font-bold">Balance</span>
+                                        <span className="font-extrabold text-red-600">{formatCurrency(viewingExpense.amount - viewingExpense.paidAmount, user?.currency ?? undefined)}</span>
+                                    </div>
                                 </div>
-                                <div className="flex justify-between items-center text-lg">
-                                    <span className="font-medium text-muted-foreground">Amount Paid</span>
-                                    <span className="font-bold text-green-600">{formatCurrency(viewingExpense.paidAmount, user?.currency ?? undefined)}</span>
-                                </div>
-                                <div className="flex justify-between items-center text-lg border-t pt-2">
-                                    <span className="font-bold">Balance</span>
-                                    <span className="font-extrabold text-red-600">{formatCurrency(viewingExpense.amount - viewingExpense.paidAmount, user?.currency ?? undefined)}</span>
-                                </div>
-                            </div>
 
-                            <div className="grid grid-cols-2 gap-4 text-sm">
-                                <div>
-                                    <p className="text-muted-foreground mb-1">Due Date</p>
-                                    <p className="font-medium">{viewingExpense.dueDate}</p>
-                                </div>
-                                <div>
-                                    <p className="text-muted-foreground mb-1">Status</p>
-                                    <ExpenseStatusBadge status={viewingExpense.status} />
-                                </div>
-                                {viewingExpense.expiryDate && (
+                                <div className="grid grid-cols-2 gap-4 text-sm">
                                     <div>
-                                        <p className="text-muted-foreground mb-1">Expiry Date</p>
-                                        <p className="font-medium">{viewingExpense.expiryDate}</p>
+                                        <p className="text-muted-foreground mb-1">Due Date</p>
+                                        <p className="font-medium">{viewingExpense.dueDate}</p>
+                                    </div>
+                                    <div>
+                                        <p className="text-muted-foreground mb-1">Status</p>
+                                        <ExpenseStatusBadge status={viewingExpense.status} />
+                                    </div>
+                                    {viewingExpense.expiryDate && (
+                                        <div>
+                                            <p className="text-muted-foreground mb-1">Expiry Date</p>
+                                            <p className="font-medium">{viewingExpense.expiryDate}</p>
+                                        </div>
+                                    )}
+                                    {viewingExpense.isRecurring && (
+                                        <div>
+                                            <p className="text-muted-foreground mb-1">Recurring</p>
+                                            <div className="flex items-center gap-1">
+                                                <Repeat className="h-3 w-3" />
+                                                <p className="font-medium capitalize">{viewingExpense.frequency}</p>
+                                            </div>
+                                        </div>
+                                    )}
+                                    {viewingExpense.paidDate && (
+                                        <div>
+                                            <p className="text-muted-foreground mb-1">Last Paid Date</p>
+                                            <p className="font-medium">{viewingExpense.paidDate}</p>
+                                        </div>
+                                    )}
+                                    {viewingExpense.paymentMethod && (
+                                        <div>
+                                            <p className="text-muted-foreground mb-1">Payment Method</p>
+                                            <p className="font-medium capitalize">{viewingExpense.paymentMethod.replace('_', ' ')}</p>
+                                        </div>
+                                    )}
+                                </div>
+
+                                {viewingExpense.reference && (
+                                    <div className="text-sm">
+                                        <p className="text-muted-foreground mb-1">Reference / Transaction ID</p>
+                                        <p className="font-mono bg-accent p-2 rounded">{viewingExpense.reference}</p>
                                     </div>
                                 )}
-                                {viewingExpense.isRecurring && (
-                                    <div>
-                                        <p className="text-muted-foreground mb-1">Recurring</p>
-                                        <div className="flex items-center gap-1">
-                                            <Repeat className="h-3 w-3" />
-                                            <p className="font-medium capitalize">{viewingExpense.frequency}</p>
+
+                                {viewingExpense.notes && (
+                                    <div className="text-sm">
+                                        <p className="text-muted-foreground mb-1">Notes</p>
+                                        <div className="bg-accent p-3 rounded italic whitespace-pre-wrap">
+                                            "{viewingExpense.notes}"
                                         </div>
                                     </div>
                                 )}
-                                {viewingExpense.paidDate && (
-                                    <div>
-                                        <p className="text-muted-foreground mb-1">Last Paid Date</p>
-                                        <p className="font-medium">{viewingExpense.paidDate}</p>
-                                    </div>
-                                )}
-                                {viewingExpense.paymentMethod && (
-                                    <div>
-                                        <p className="text-muted-foreground mb-1">Payment Method</p>
-                                        <p className="font-medium capitalize">{viewingExpense.paymentMethod.replace('_', ' ')}</p>
-                                    </div>
-                                )}
-                            </div>
 
-                            {viewingExpense.reference && (
-                                <div className="text-sm">
-                                    <p className="text-muted-foreground mb-1">Reference / Transaction ID</p>
-                                    <p className="font-mono bg-accent p-2 rounded">{viewingExpense.reference}</p>
+                                <div className="flex justify-end">
+                                    <Button variant="outline" onClick={() => setViewingExpense(null)}>Close</Button>
                                 </div>
-                            )}
-
-                            {viewingExpense.notes && (
-                                <div className="text-sm">
-                                    <p className="text-muted-foreground mb-1">Notes</p>
-                                    <div className="bg-accent p-3 rounded italic whitespace-pre-wrap">
-                                        "{viewingExpense.notes}"
-                                    </div>
-                                </div>
-                            )}
-
-                            <div className="flex justify-end">
-                                <Button variant="outline" onClick={() => setViewingExpense(null)}>Close</Button>
                             </div>
-                        </div>
-                    )}
-                </DialogContent>
-            </Dialog>
-        </div>
+                        )}
+                    </DialogContent>
+                </Dialog>
+            </div>
         </ErrorBoundary>
     );
 }

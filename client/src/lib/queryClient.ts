@@ -43,9 +43,15 @@ export async function apiRequest(
   url: string,
   data?: unknown | undefined,
 ): Promise<Response> {
+  // #region agent log
+  fetch('http://127.0.0.1:7242/ingest/3ed85ae8-4691-4490-b4b4-297755767225',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'client/src/lib/queryClient.ts:41',message:'apiRequest entry',data:{method,url,hasData:!!data,dataKeys:data?Object.keys(data as any):null},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'E'})}).catch(()=>{});
+  // #endregion
   try {
     const { data: { session } } = await supabase.auth.getSession();
     const token = session?.access_token;
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/3ed85ae8-4691-4490-b4b4-297755767225',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'client/src/lib/queryClient.ts:48',message:'Session retrieved',data:{hasSession:!!session,hasToken:!!token,tokenLength:token?.length},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
+    // #endregion
 
     const headers: Record<string, string> = {};
     if (data) {
@@ -55,15 +61,24 @@ export async function apiRequest(
       headers["Authorization"] = `Bearer ${token}`;
     }
 
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/3ed85ae8-4691-4490-b4b4-297755767225',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'client/src/lib/queryClient.ts:58',message:'Making fetch request',data:{method,url,hasAuth:!!token,bodySize:data?JSON.stringify(data).length:0},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'E'})}).catch(()=>{});
+    // #endregion
     const res = await fetch(url, {
       method,
       headers,
       body: data ? JSON.stringify(data) : undefined,
     });
 
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/3ed85ae8-4691-4490-b4b4-297755767225',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'client/src/lib/queryClient.ts:64',message:'Fetch response received',data:{status:res.status,statusText:res.statusText,ok:res.ok},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'E'})}).catch(()=>{});
+    // #endregion
     await throwIfResNotOk(res);
     return res;
   } catch (error) {
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/3ed85ae8-4691-4490-b4b4-297755767225',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'client/src/lib/queryClient.ts:68',message:'apiRequest error',data:{errorMessage:error instanceof Error ? error.message : String(error),errorName:error instanceof Error ? error.name : 'Unknown',isNetworkError:error instanceof TypeError && error.message.includes('fetch')},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'E'})}).catch(()=>{});
+    // #endregion
     // Re-throw with more context if it's a network error
     if (error instanceof TypeError && error.message.includes("fetch")) {
       throw new Error("Network error: Unable to connect to the server. Please check your internet connection and try again.");

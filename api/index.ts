@@ -33,19 +33,27 @@ async function getApp() {
 
     try {
         console.log('Initializing serverless function...');
-        
+
         // Import the app and initialization promise
         const module = await import('../dist/index.cjs');
-        appInstance = module.default;
+
+        // Handle both ESM default and CJS exports
+        appInstance = module.default || module;
+
+        // If it's a bundled object structure ({ default: ... }), unwrap it
+        if (appInstance && typeof appInstance === 'object' && appInstance.default) {
+            appInstance = appInstance.default;
+        }
+
         initPromise = module.initPromise;
 
         // Wait for initialization to complete with timeout
-        const timeout = new Promise((_, reject) => 
+        const timeout = new Promise((_, reject) =>
             setTimeout(() => reject(new Error('Initialization timeout after 10 seconds')), 10000)
         );
-        
+
         await Promise.race([initPromise, timeout]);
-        
+
         console.log('Serverless function initialized successfully');
         return appInstance;
     } catch (error) {
@@ -53,7 +61,7 @@ async function getApp() {
         const errorMessage = error instanceof Error ? error.message : String(error);
         const errorStack = error instanceof Error ? error.stack : undefined;
         console.error('Error details:', { errorMessage, errorStack });
-        
+
         // Reset state on error
         appInstance = null;
         initPromise = null;
@@ -66,15 +74,30 @@ async function getApp() {
 export default async (req: any, res: any) => {
     try {
         const app = await getApp();
-        
+
         // Handle the request with Express app
         // Vercel passes (req, res) directly to Express
-        return app(req, res);
+        // Use a promise wrapper to handle async Express handlers
+        return new Promise((resolve, reject) => {
+            try {
+                app(req, res, (err: any) => {
+                    if (err) {
+                        console.error('Express error:', err);
+                        reject(err);
+                    } else {
+                        resolve(undefined);
+                    }
+                });
+            } catch (err) {
+                console.error('Error calling Express app:', err);
+                reject(err);
+            }
+        });
     } catch (error) {
         console.error('Serverless function error:', error);
         const errorMessage = error instanceof Error ? error.message : String(error);
         const errorStack = error instanceof Error ? error.stack : undefined;
-        
+
         // Log full error details for debugging
         console.error('Full error:', {
             message: errorMessage,
@@ -85,7 +108,7 @@ export default async (req: any, res: any) => {
                 hasSupabaseKey: !!(process.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY),
             }
         });
-        
+
         // Return a proper error response
         if (!res.headersSent) {
             res.status(500).json({

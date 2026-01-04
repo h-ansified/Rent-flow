@@ -7,7 +7,7 @@ import { registerRoutes } from "./routes";
 import { serveStatic } from "./static";
 import { createServer } from "http";
 import { pool, db } from "./db";
-import { users, properties, tenants, payments, maintenanceRequests } from "@shared/schema";
+import { users, properties, tenants, payments, maintenanceRequests, type User } from "@shared/schema";
 import { hashPassword } from "./auth";
 import { eq, and } from "drizzle-orm";
 

@@ -9,9 +9,24 @@ if (!process.env.DATABASE_URL) {
     throw new Error(errorMsg);
 }
 
-// Create PostgreSQL connection pool
+// Create PostgreSQL connection pool with error handling
 const pool = new Pool({
     connectionString: process.env.DATABASE_URL,
+    // Add connection timeout and retry settings
+    connectionTimeoutMillis: 10000,
+    idleTimeoutMillis: 30000,
+    max: 10,
+});
+
+// Handle pool errors
+pool.on('error', (err) => {
+    console.error('Unexpected database pool error:', err);
+});
+
+// Test connection on startup
+pool.query('SELECT NOW()').catch((err) => {
+    console.error('Database connection test failed:', err);
+    console.error('Please check your DATABASE_URL environment variable.');
 });
 
 // Create Drizzle ORM instance with schema

@@ -672,21 +672,36 @@ class DatabaseStorage {
   }
 
   async getAllExpenses(userId: string): Promise<(Expense & { propertyName?: string })[]> {
-    await this.updateOverdueExpenses(userId);
-    const result = await db
-      .select({
-        expense: expenses,
-        propertyName: properties.name,
-      })
-      .from(expenses)
-      .leftJoin(properties, eq(expenses.propertyId, properties.id))
-      .where(eq(expenses.userId, userId))
-      .orderBy(desc(expenses.dueDate));
-
-    return result.map((row) => ({
-      ...row.expense,
-      propertyName: row.propertyName || undefined,
-    }));
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/3ed85ae8-4691-4490-b4b4-297755767225',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'server/storage.ts:674',message:'getAllExpenses entry',data:{userId,hasUserId:!!userId},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'F'})}).catch(()=>{});
+    // #endregion
+    try {
+      if (!userId) {
+        throw new Error("User ID is required to fetch expenses");
+      }
+      await this.updateOverdueExpenses(userId);
+      const result = await db
+        .select({
+          expense: expenses,
+          propertyName: properties.name,
+        })
+        .from(expenses)
+        .leftJoin(properties, eq(expenses.propertyId, properties.id))
+        .where(eq(expenses.userId, userId))
+        .orderBy(desc(expenses.dueDate));
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/3ed85ae8-4691-4490-b4b4-297755767225',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'server/storage.ts:686',message:'getAllExpenses success',data:{count:result.length},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'F'})}).catch(()=>{});
+      // #endregion
+      return result.map((row) => ({
+        ...row.expense,
+        propertyName: row.propertyName || undefined,
+      }));
+    } catch (error) {
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/3ed85ae8-4691-4490-b4b4-297755767225',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'server/storage.ts:693',message:'getAllExpenses database error',data:{errorMessage:error instanceof Error ? error.message : String(error),errorName:error instanceof Error ? error.name : 'Unknown',isConnectionError:error instanceof Error && (error.message.includes('connect') || error.message.includes('ECONNREFUSED') || error.message.includes('timeout'))},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'F'})}).catch(()=>{});
+      // #endregion
+      throw error;
+    }
   }
 
   async getExpense(id: string, userId: string): Promise<Expense | undefined> {
@@ -699,11 +714,30 @@ class DatabaseStorage {
   }
 
   async createExpense(insertExpense: InsertExpense, userId: string): Promise<Expense> {
-    const [expense] = await db
-      .insert(expenses)
-      .values({ ...insertExpense, userId })
-      .returning();
-    return expense;
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/3ed85ae8-4691-4490-b4b4-297755767225',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'server/storage.ts:701',message:'createExpense entry',data:{userId,expenseKeys:Object.keys(insertExpense||{}),hasTitle:!!insertExpense?.title,hasAmount:!!insertExpense?.amount},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
+    // #endregion
+    try {
+      if (!userId) {
+        throw new Error("User ID is required to create expense");
+      }
+      if (!insertExpense) {
+        throw new Error("Expense data is required");
+      }
+      const [expense] = await db
+        .insert(expenses)
+        .values({ ...insertExpense, userId })
+        .returning();
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/3ed85ae8-4691-4490-b4b4-297755767225',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'server/storage.ts:710',message:'createExpense success',data:{expenseId:expense.id},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
+      // #endregion
+      return expense;
+    } catch (error) {
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/3ed85ae8-4691-4490-b4b4-297755767225',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'server/storage.ts:714',message:'createExpense database error',data:{errorMessage:error instanceof Error ? error.message : String(error),errorName:error instanceof Error ? error.name : 'Unknown',isConnectionError:error instanceof Error && (error.message.includes('connect') || error.message.includes('ECONNREFUSED') || error.message.includes('timeout'))},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
+      // #endregion
+      throw error;
+    }
   }
 
   async updateExpense(

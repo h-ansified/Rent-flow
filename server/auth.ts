@@ -59,21 +59,36 @@ export function isValidEmail(email: string): boolean {
  * Verifies the Bearer token using Supabase
  */
 export async function requireAuth(req: Request, res: Response, next: NextFunction) {
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/3ed85ae8-4691-4490-b4b4-297755767225',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'server/auth.ts:61',message:'requireAuth entry',data:{hasAuthHeader:!!req.headers.authorization,path:req.path,method:req.method},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
+    // #endregion
     const authHeader = req.headers.authorization;
 
     if (!authHeader) {
+        // #region agent log
+        fetch('http://127.0.0.1:7242/ingest/3ed85ae8-4691-4490-b4b4-297755767225',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'server/auth.ts:65',message:'No auth header',data:{path:req.path},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
+        // #endregion
         return res.status(401).json({ error: "No authorization header" });
     }
 
     const token = authHeader.split(" ")[1];
     if (!token) {
+        // #region agent log
+        fetch('http://127.0.0.1:7242/ingest/3ed85ae8-4691-4490-b4b4-297755767225',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'server/auth.ts:70',message:'No token in header',data:{path:req.path},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
+        // #endregion
         return res.status(401).json({ error: "No token provided" });
     }
 
     try {
+        // #region agent log
+        fetch('http://127.0.0.1:7242/ingest/3ed85ae8-4691-4490-b4b4-297755767225',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'server/auth.ts:74',message:'Verifying token with Supabase',data:{tokenLength:token.length,hasSupabaseUrl:!!supabaseUrl,hasSupabaseKey:!!supabaseKey},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
+        // #endregion
         const { data: { user }, error } = await supabase.auth.getUser(token);
 
         if (error || !user) {
+            // #region agent log
+            fetch('http://127.0.0.1:7242/ingest/3ed85ae8-4691-4490-b4b4-297755767225',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'server/auth.ts:77',message:'Auth verification failed',data:{error:error?.message,hasUser:!!user},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
+            // #endregion
             console.error("Auth error:", error);
             return res.status(401).json({ error: "Invalid token" });
         }
@@ -83,12 +98,18 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
             id: user.id,
             email: user.email!,
         };
+        // #region agent log
+        fetch('http://127.0.0.1:7242/ingest/3ed85ae8-4691-4490-b4b4-297755767225',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'server/auth.ts:85',message:'Auth success',data:{userId:user.id,email:user.email},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
+        // #endregion
 
         // We rely on the database trigger to sync the user to the 'users' table.
         // The trigger 'on_auth_user_created' handles this on signup.
 
         next();
     } catch (err) {
+        // #region agent log
+        fetch('http://127.0.0.1:7242/ingest/3ed85ae8-4691-4490-b4b4-297755767225',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'server/auth.ts:93',message:'Auth middleware exception',data:{errorMessage:err instanceof Error ? err.message : String(err),errorStack:err instanceof Error ? err.stack : undefined},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
+        // #endregion
         console.error("Auth middleware error:", err);
         res.status(500).json({ error: "Internal server error" });
     }

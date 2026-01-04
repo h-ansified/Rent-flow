@@ -2,6 +2,8 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import rateLimit from "express-rate-limit";
 import { storage } from "./storage";
+import { db } from "./db";
+import { sql } from "drizzle-orm";
 import { insertPropertySchema, insertTenantSchema, insertPaymentSchema, insertPaymentHistorySchema, insertMaintenanceRequestSchema, insertExpenseSchema } from "@shared/schema";
 import { authRouter, requireAuth } from "./auth";
 
@@ -22,6 +24,41 @@ export async function registerRoutes(
   // Health check route
   app.get("/api/health", (_req, res) => {
     res.json({ status: "ok", timestamp: new Date().toISOString() });
+  });
+
+  // Diagnostic route to check environment and database
+  app.get("/api/diagnostic", async (_req, res) => {
+    try {
+      const diagnostics = {
+        timestamp: new Date().toISOString(),
+        environment: {
+          hasDatabaseUrl: !!process.env.DATABASE_URL,
+          hasSupabaseUrl: !!(process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL),
+          hasSupabaseKey: !!(process.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY),
+          nodeEnv: process.env.NODE_ENV,
+        },
+        database: {
+          connected: false,
+          error: null as string | null,
+        },
+      };
+
+      // Test database connection
+      try {
+        await db.execute(sql`SELECT 1`);
+        diagnostics.database.connected = true;
+      } catch (dbError) {
+        diagnostics.database.connected = false;
+        diagnostics.database.error = dbError instanceof Error ? dbError.message : String(dbError);
+      }
+
+      res.json(diagnostics);
+    } catch (error) {
+      res.status(500).json({
+        error: "Diagnostic check failed",
+        message: error instanceof Error ? error.message : String(error),
+      });
+    }
   });
 
   // Authentication routes (public, with rate limiting)
@@ -133,15 +170,24 @@ export async function registerRoutes(
   });
 
   app.post("/api/properties", requireAuth, async (req, res) => {
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/3ed85ae8-4691-4490-b4b4-297755767225',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'server/routes.ts:135',message:'POST /api/properties entry',data:{hasAuth:!!req.user,userId:req.user?.id,bodyKeys:Object.keys(req.body||{})},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+    // #endregion
     try {
       const userId = req.user!.id;
       const parsed = insertPropertySchema.safeParse(req.body);
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/3ed85ae8-4691-4490-b4b4-297755767225',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'server/routes.ts:139',message:'Property schema validation',data:{success:parsed.success,errors:parsed.success?null:parsed.error.errors},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+      // #endregion
       if (!parsed.success) {
         return res.status(400).json({ error: "Invalid property data", details: parsed.error.errors });
       }
       const property = await storage.createProperty(parsed.data, userId);
       res.status(201).json(property);
     } catch (error) {
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/3ed85ae8-4691-4490-b4b4-297755767225',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'server/routes.ts:145',message:'POST /api/properties error',data:{errorMessage:error instanceof Error ? error.message : String(error)},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+      // #endregion
       console.error("Error in POST /api/properties:", error);
       const errorMessage = error instanceof Error ? error.message : String(error);
       const errorStack = error instanceof Error ? error.stack : undefined;
@@ -443,17 +489,41 @@ export async function registerRoutes(
 
   // Expense routes (protected)
   app.get("/api/expenses", requireAuth, async (req, res) => {
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/3ed85ae8-4691-4490-b4b4-297755767225',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'server/routes.ts:445',message:'GET /api/expenses entry',data:{hasAuth:!!req.user,userId:req.user?.id,hasAuthHeader:!!req.headers.authorization},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'F'})}).catch(()=>{});
+    // #endregion
     try {
-      const userId = req.user!.id;
+      if (!req.user || !req.user.id) {
+        return res.status(401).json({ error: "Authentication required" });
+      }
+      const userId = req.user.id;
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/3ed85ae8-4691-4490-b4b4-297755767225',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'server/routes.ts:450',message:'Calling getAllExpenses',data:{userId},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'F'})}).catch(()=>{});
+      // #endregion
       const expenses = await storage.getAllExpenses(userId);
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/3ed85ae8-4691-4490-b4b4-297755767225',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'server/routes.ts:452',message:'getAllExpenses success',data:{count:expenses.length},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'F'})}).catch(()=>{});
+      // #endregion
       res.json(expenses);
     } catch (error) {
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/3ed85ae8-4691-4490-b4b4-297755767225',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'server/routes.ts:455',message:'GET /api/expenses error',data:{errorMessage:error instanceof Error ? error.message : String(error),errorStack:error instanceof Error ? error.stack : undefined,errorName:error instanceof Error ? error.name : 'Unknown',isConnectionError:error instanceof Error && (error.message.includes('connect') || error.message.includes('ECONNREFUSED') || error.message.includes('timeout') || error.message.includes('DATABASE_URL'))},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'F'})}).catch(()=>{});
+      // #endregion
       console.error("Error in /api/expenses:", error);
       const errorMessage = error instanceof Error ? error.message : String(error);
       const errorStack = error instanceof Error ? error.stack : undefined;
       console.error("Full error details:", { errorMessage, errorStack });
+      
+      // Check if it's a connection error
+      const isConnectionError = errorMessage.includes('connect') || 
+                                errorMessage.includes('ECONNREFUSED') || 
+                                errorMessage.includes('timeout') ||
+                                errorMessage.includes('DATABASE_URL');
+      
       res.status(500).json({ 
-        error: "Failed to fetch expenses",
+        error: isConnectionError 
+          ? "Database connection failed. Please check your DATABASE_URL environment variable."
+          : "Failed to fetch expenses",
         details: process.env.NODE_ENV === "development" ? errorMessage : undefined
       });
     }
@@ -473,15 +543,42 @@ export async function registerRoutes(
   });
 
   app.post("/api/expenses", requireAuth, async (req, res) => {
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/3ed85ae8-4691-4490-b4b4-297755767225',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'server/routes.ts:475',message:'POST /api/expenses entry',data:{hasAuth:!!req.user,userId:req.user?.id,bodyKeys:Object.keys(req.body||{}),bodySize:JSON.stringify(req.body||{}).length,hasBody:!!req.body},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+    // #endregion
     try {
-      const userId = req.user!.id;
+      if (!req.user || !req.user.id) {
+        // #region agent log
+        fetch('http://127.0.0.1:7242/ingest/3ed85ae8-4691-4490-b4b4-297755767225',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'server/routes.ts:477',message:'Missing user in request',data:{hasUser:!!req.user},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'})}).catch(()=>{});
+        // #endregion
+        return res.status(401).json({ error: "Authentication required" });
+      }
+      const userId = req.user.id;
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/3ed85ae8-4691-4490-b4b4-297755767225',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'server/routes.ts:482',message:'userId extracted',data:{userId},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'})}).catch(()=>{});
+      // #endregion
+      if (!req.body) {
+        // #region agent log
+        fetch('http://127.0.0.1:7242/ingest/3ed85ae8-4691-4490-b4b4-297755767225',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'server/routes.ts:485',message:'Missing request body',data:{timestamp:Date.now()},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'E'})}).catch(()=>{});
+        // #endregion
+        return res.status(400).json({ error: "Request body is required" });
+      }
       const parsed = insertExpenseSchema.safeParse(req.body);
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/3ed85ae8-4691-4490-b4b4-297755767225',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'server/routes.ts:489',message:'Schema validation result',data:{success:parsed.success,errors:parsed.success?null:parsed.error.errors},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+      // #endregion
       if (!parsed.success) {
         return res.status(400).json({ error: "Invalid expense data", details: parsed.error.errors });
       }
       const expense = await storage.createExpense(parsed.data, userId);
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/3ed85ae8-4691-4490-b4b4-297755767225',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'server/routes.ts:495',message:'Expense created successfully',data:{expenseId:expense.id},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+      // #endregion
       res.status(201).json(expense);
     } catch (error) {
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/3ed85ae8-4691-4490-b4b4-297755767225',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'server/routes.ts:499',message:'POST /api/expenses error',data:{errorMessage:error instanceof Error ? error.message : String(error),errorStack:error instanceof Error ? error.stack : undefined,errorName:error instanceof Error ? error.name : 'Unknown'},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+      // #endregion
       console.error("Error in POST /api/expenses:", error);
       const errorMessage = error instanceof Error ? error.message : String(error);
       const errorStack = error instanceof Error ? error.stack : undefined;
