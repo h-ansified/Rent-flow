@@ -7,21 +7,16 @@ const client = new pg.Client({
     ssl: { rejectUnauthorized: false }
 });
 
-async function checkRLS() {
+async function listUsers() {
     try {
         await client.connect();
-        const res = await client.query(`
-            SELECT tablename, rowsecurity 
-            FROM pg_tables 
-            WHERE schemaname = 'public'
-        `);
-        console.log("RLS STATUS:");
+        const res = await client.query('SELECT id, email, username, role FROM users');
         console.table(res.rows);
     } catch (e) {
-        console.error("Failed to check RLS:", e);
+        console.error("List users failed:", e);
     } finally {
         await client.end();
     }
 }
 
-checkRLS();
+listUsers();
