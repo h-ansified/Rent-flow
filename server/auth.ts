@@ -165,6 +165,10 @@ router.patch("/profile", requireAuth, async (req: Request, res: Response) => {
             .where(eq(users.id, req.user!.id))
             .returning();
 
+        if (!updatedUser) {
+            return res.status(404).json({ error: "User not found or update failed" });
+        }
+
         const { password: _, ...userWithoutPassword } = updatedUser;
         res.json({ user: userWithoutPassword });
     } catch (error) {

@@ -38,6 +38,13 @@ app.use(
 
 app.use(express.urlencoded({ extended: false }));
 
+// Handle OPTIONS preflight for all routes (fixes potential 405 errors)
+app.options("*", (_req, res) => {
+  res.setHeader("Access-Control-Allow-Methods", "GET, POST, PATCH, PUT, DELETE, OPTIONS");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
+  res.sendStatus(204);
+});
+
 // Session configuration
 if (!process.env.SESSION_SECRET) {
   console.warn("WARNING: SESSION_SECRET not set! Using insecure default for development only.");

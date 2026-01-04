@@ -6,6 +6,16 @@ ALTER TABLE payments ENABLE ROW LEVEL SECURITY;
 ALTER TABLE expenses ENABLE ROW LEVEL SECURITY;
 ALTER TABLE maintenance_requests ENABLE ROW LEVEL SECURITY;
 ALTER TABLE payment_history ENABLE ROW LEVEL SECURITY;
+ALTER TABLE users ENABLE ROW LEVEL SECURITY;
+ALTER TABLE session ENABLE ROW LEVEL SECURITY;
+
+-- 0. USERS
+CREATE POLICY "Users can manage own profile" ON users
+FOR ALL USING (auth.uid()::text = id);
+
+-- 0.1 SESSION (Internal server use, usually bypasses RLS but let's be safe)
+CREATE POLICY "Internal server can manage sessions" ON session
+FOR ALL USING (true);
 
 -- 1. PROPERTIES
 -- Landlords can do everything with their own properties
