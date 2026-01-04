@@ -39,7 +39,7 @@ export default function Login() {
 
     // Auto-fill demo credentials
     const handleTryDemo = () => {
-        setValue("email", "demo@rentflow.app");
+        setValue("email", "rentflow.demo.248@gmail.com");
         setValue("password", "Demo123!");
     };
 
@@ -91,7 +91,7 @@ export default function Login() {
                     <CardContent className="space-y-2">
                         <div className="flex items-center gap-2 text-sm font-mono bg-background/50 rounded p-2">
                             <Mail className="h-4 w-4 text-muted-foreground" />
-                            <span className="text-foreground">demo@rentflow.app</span>
+                            <span className="text-foreground">rentflow.demo.248@gmail.com</span>
                         </div>
                         <div className="flex items-center gap-2 text-sm font-mono bg-background/50 rounded p-2">
                             <Lock className="h-4 w-4 text-muted-foreground" />
@@ -110,7 +110,7 @@ export default function Login() {
                         <Button
                             variant="default"
                             className="w-full"
-                            onClick={() => onSubmit({ email: "demo@rentflow.app", password: "Demo123!", rememberMe: true })}
+                            onClick={() => onSubmit({ email: "rentflow.demo.248@gmail.com", password: "Demo123!", rememberMe: true })}
                             type="button"
                         >
                             Launch Demo Now

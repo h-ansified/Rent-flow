@@ -126,49 +126,64 @@ async function lowercaseExistingEmails() {
 
 async function seedDemoUser() {
   try {
-    const demoEmail = "demo@rentflow.app";
+    const userDemoEmail = "rentflow.demo.248@gmail.com";
     const demoPassword = "Demo123!";
     const hashedPassword = await hashPassword(demoPassword);
 
-    // 1. Create or Update Demo User
-    let [demoUser] = await db
+    // 1. CLEANUP: Delete the old demo user if it exists
+    // This will cascadingly delete properties, tenants, etc.
+    const oldDemoEmail = "demo@rentflow.app";
+    await db.delete(users).where(eq(users.email, oldDemoEmail));
+    log(`Cleanup: Old demo account ${oldDemoEmail} removed.`);
+
+    // 2. SEED: Ensure rentflow.demo.248@gmail.com exists and has data
+    let [targetUser] = await db
       .select()
       .from(users)
-      .where(eq(users.email, demoEmail))
+      .where(eq(users.email, userDemoEmail))
       .limit(1);
 
-    if (!demoUser) {
-      [demoUser] = await db.insert(users).values({
-        username: "demo_user",
-        email: demoEmail,
+    if (!targetUser) {
+      log(`Creating target demo user: ${userDemoEmail}`);
+      [targetUser] = await db.insert(users).values({
+        username: "rentflow_demo",
+        email: userDemoEmail,
         password: hashedPassword,
         firstName: "Demo",
         lastName: "User",
-        companyName: "Demo Properties Ltd",
+        companyName: "RentFlow Properties",
         currency: "KSH",
       }).returning();
-      log("Demo user created successfully: demo@rentflow.app");
-    } else {
-      // Force password and currency to ensure login always works
-      await db.update(users).set({
-        password: hashedPassword,
-        currency: "KSH"
-      }).where(eq(users.email, demoEmail));
-      log("Demo user updated (password & currency synced)");
     }
 
-    // 2. Check for existing data
-    const existingProperties = await db.select().from(properties).where(eq(properties.userId, demoUser.id)).limit(1);
+    if (targetUser) {
+      await seedDataForUser(targetUser, hashedPassword);
+    }
+  } catch (error) {
+    console.warn("Demo seeding failed:", error instanceof Error ? error.message : error);
+  }
+}
+
+async function seedDataForUser(userRecord: User, hashedPassword: string) {
+  try {
+    // Force password and currency to ensure login always works for demo purposes
+    await db.update(users).set({
+      password: hashedPassword,
+      currency: "KSH"
+    }).where(eq(users.id, userRecord.id));
+
+    // Check for existing data
+    const existingProperties = await db.select().from(properties).where(eq(properties.userId, userRecord.id)).limit(1);
     if (existingProperties.length > 0) {
-      log("Demo data already exists, skipping property/tenant seeding");
+      log(`Demo data already exists for ${userRecord.email}, skipping seeding`);
       return;
     }
 
-    log("Seeding default demo data...");
+    log(`Seeding default demo data for ${userRecord.email}...`);
 
     // 3. Seed Properties
     const [prop1] = await db.insert(properties).values({
-      userId: demoUser.id,
+      userId: userRecord.id,
       name: "Ocean View Apartments",
       address: "123 Beach Road",
       city: "Mombasa",
@@ -181,7 +196,7 @@ async function seedDemoUser() {
     }).returning();
 
     const [prop2] = await db.insert(properties).values({
-      userId: demoUser.id,
+      userId: userRecord.id,
       name: "Heights Residency",
       address: "45 Ngong Road",
       city: "Nairobi",
@@ -195,7 +210,7 @@ async function seedDemoUser() {
 
     // 4. Seed Tenants
     const [tenant1] = await db.insert(tenants).values({
-      userId: demoUser.id,
+      userId: userRecord.id,
       propertyId: prop1.id,
       firstName: "John",
       lastName: "Doe",
@@ -209,7 +224,7 @@ async function seedDemoUser() {
     }).returning();
 
     const [tenant2] = await db.insert(tenants).values({
-      userId: demoUser.id,
+      userId: userRecord.id,
       propertyId: prop1.id,
       firstName: "Jane",
       lastName: "Smith",
@@ -223,7 +238,7 @@ async function seedDemoUser() {
     }).returning();
 
     const [tenant3] = await db.insert(tenants).values({
-      userId: demoUser.id,
+      userId: userRecord.id,
       propertyId: prop2.id,
       firstName: "Alice",
       lastName: "Wanjiku",
@@ -243,7 +258,7 @@ async function seedDemoUser() {
 
     await db.insert(payments).values([
       {
-        userId: demoUser.id,
+        userId: userRecord.id,
         tenantId: tenant1.id,
         propertyId: prop1.id,
         amount: 45000,
@@ -255,7 +270,7 @@ async function seedDemoUser() {
         reference: "QTY789XCV",
       },
       {
-        userId: demoUser.id,
+        userId: userRecord.id,
         tenantId: tenant2.id,
         propertyId: prop1.id,
         amount: 45000,
@@ -265,7 +280,7 @@ async function seedDemoUser() {
         notes: "Partial payment made",
       },
       {
-        userId: demoUser.id,
+        userId: userRecord.id,
         tenantId: tenant3.id,
         propertyId: prop2.id,
         amount: 75000,
@@ -277,7 +292,7 @@ async function seedDemoUser() {
 
     // 6. Seed Maintenance
     await db.insert(maintenanceRequests).values({
-      userId: demoUser.id,
+      userId: userRecord.id,
       propertyId: prop1.id,
       tenantId: tenant1.id,
       title: "Leaky Faucet",
@@ -288,7 +303,7 @@ async function seedDemoUser() {
       createdAt: today.toISOString().split('T')[0],
     });
 
-    log("Demo data seeded successfully.");
+    log(`Demo data seeded successfully for ${userRecord.email}.`);
   } catch (error) {
     console.warn("Demo seeding failed:", error instanceof Error ? error.message : error);
   }

@@ -293,7 +293,6 @@ export default function Expenses() {
     const [selectedExpense, setSelectedExpense] = useState<ExpenseWithProperty | null>(null);
     const [viewingExpense, setViewingExpense] = useState<ExpenseWithProperty | null>(null);
 
-    // Form state
     const [title, setTitle] = useState("");
     const [category, setCategory] = useState("electricity");
     const [amount, setAmount] = useState("");
@@ -301,7 +300,7 @@ export default function Expenses() {
     const [expiryDate, setExpiryDate] = useState("");
     const [isRecurring, setIsRecurring] = useState(false);
     const [frequency, setFrequency] = useState("monthly");
-    const [propertyId, setPropertyId] = useState<string>("");
+    const [propertyId, setPropertyId] = useState("");
     const [notes, setNotes] = useState("");
 
     // Payment recording state
@@ -318,25 +317,6 @@ export default function Expenses() {
     const { data: properties } = useQuery<Property[]>({
         queryKey: ["/api/properties"],
     });
-
-    // Handle error state
-    if (error) {
-        return (
-            <div className="p-6">
-                <Alert variant="destructive">
-                    <AlertCircle className="h-4 w-4" />
-                    <AlertTitle>Database Error</AlertTitle>
-                    <AlertDescription>
-                        Failed to load expenses. This usually means the expenses table hasn't been created yet.
-                        <br /><br />
-                        <strong>To fix this:</strong> Run <code className="bg-muted px-2 py-1 rounded">npm run db:push</code> in your terminal.
-                        <br /><br />
-                        If PowerShell gives an error, first run: <code className="bg-muted px-2 py-1 rounded">Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser</code>
-                    </AlertDescription>
-                </Alert>
-            </div>
-        );
-    }
 
     const createExpenseMutation = useMutation({
         mutationFn: async (data: any) => {
@@ -396,6 +376,25 @@ export default function Expenses() {
             });
         },
     });
+
+    // Handle error state AFTER all hooks have been called
+    if (error) {
+        return (
+            <div className="p-6">
+                <Alert variant="destructive">
+                    <AlertCircle className="h-4 w-4" />
+                    <AlertTitle>Database Error</AlertTitle>
+                    <AlertDescription>
+                        Failed to load expenses. This usually means the expenses table hasn't been created yet.
+                        <br /><br />
+                        <strong>To fix this:</strong> Run <code className="bg-muted px-2 py-1 rounded">npm run db:push</code> in your terminal.
+                        <br /><br />
+                        If PowerShell gives an error, first run: <code className="bg-muted px-2 py-1 rounded">Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser</code>
+                    </AlertDescription>
+                </Alert>
+            </div>
+        );
+    }
 
     const resetForm = () => {
         setTitle("");

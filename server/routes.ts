@@ -34,6 +34,7 @@ export async function registerRoutes(
       const metrics = await storage.getDashboardMetrics(userId);
       res.json(metrics);
     } catch (error) {
+      console.error("Error in /api/dashboard/metrics:", error);
       res.status(500).json({ error: "Failed to fetch dashboard metrics" });
     }
   });
@@ -44,6 +45,7 @@ export async function registerRoutes(
       const revenue = await storage.getRevenueData(userId);
       res.json(revenue);
     } catch (error) {
+      console.error("Error in /api/dashboard/revenue:", error);
       res.status(500).json({ error: "Failed to fetch revenue data" });
     }
   });
@@ -54,6 +56,7 @@ export async function registerRoutes(
       const activities = await storage.getRecentActivities(userId);
       res.json(activities);
     } catch (error) {
+      console.error("Error in /api/dashboard/activities:", error);
       res.status(500).json({ error: "Failed to fetch activities" });
     }
   });
@@ -64,6 +67,7 @@ export async function registerRoutes(
       const payments = await storage.getUpcomingPayments(userId);
       res.json(payments);
     } catch (error) {
+      console.error("Error in /api/dashboard/upcoming-payments:", error);
       res.status(500).json({ error: "Failed to fetch upcoming payments" });
     }
   });
@@ -74,6 +78,7 @@ export async function registerRoutes(
       const leases = await storage.getExpiringLeases(userId);
       res.json(leases);
     } catch (error) {
+      console.error("Error in /api/dashboard/expiring-leases:", error);
       res.status(500).json({ error: "Failed to fetch expiring leases" });
     }
   });
@@ -85,6 +90,7 @@ export async function registerRoutes(
       const properties = await storage.getAllProperties(userId);
       res.json(properties);
     } catch (error) {
+      console.error("Error in /api/properties:", error);
       res.status(500).json({ error: "Failed to fetch properties" });
     }
   });
@@ -397,6 +403,7 @@ export async function registerRoutes(
       const expenses = await storage.getAllExpenses(userId);
       res.json(expenses);
     } catch (error) {
+      console.error("Error in /api/expenses:", error);
       res.status(500).json({ error: "Failed to fetch expenses" });
     }
   });
