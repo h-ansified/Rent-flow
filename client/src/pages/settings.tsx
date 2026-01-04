@@ -14,6 +14,8 @@ import { Bell, Shield, User, Building2, Coins, Loader2 } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 import { useToast } from "@/hooks/use-toast";
 import { useQueryClient } from "@tanstack/react-query";
+import { apiRequest } from "@/lib/queryClient";
+import { supabase } from "@/lib/supabase";
 
 const profileSchema = z.object({
   firstName: z.string().optional(),
@@ -87,18 +89,12 @@ export default function Settings() {
   const onUpdateProfile = async (data: any) => {
     setIsUpdating(true);
     try {
-      const res = await fetch("/api/auth/profile", {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(data),
-      });
-
-      if (!res.ok) throw new Error("Failed to update profile");
+      await apiRequest("PATCH", "/api/auth/profile", data);
 
       await queryClient.invalidateQueries({ queryKey: ["auth"] });
       toast({ title: "Success", description: "Profile updated successfully" });
-    } catch (error) {
-      toast({ title: "Error", description: "Failed to update profile", variant: "destructive" });
+    } catch (error: any) {
+      toast({ title: "Error", description: error.message || "Failed to update profile", variant: "destructive" });
     } finally {
       setIsUpdating(false);
     }
@@ -107,17 +103,17 @@ export default function Settings() {
   const onChangePassword = async (data: any) => {
     setIsUpdating(true);
     try {
-      const res = await fetch("/api/auth/change-password", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          currentPassword: data.currentPassword,
-          newPassword: data.newPassword,
-        }),
+      const { error } = await supabase.auth.updateUser({
+        password: data.newPassword
       });
 
-      const result = await res.json();
-      if (!res.ok) throw new Error(result.error);
+      if (error) throw error;
+
+      // Also update local db for consistency (hashed)
+      await apiRequest("POST", "/api/auth/change-password", {
+        currentPassword: data.currentPassword,
+        newPassword: data.newPassword,
+      });
 
       toast({ title: "Success", description: "Password changed successfully" });
       passwordForm.reset();
