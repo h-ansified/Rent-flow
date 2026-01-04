@@ -315,6 +315,25 @@ import { fileURLToPath } from "url";
 // Setup logic
 async function initServer() {
   try {
+    // 0. Validate required environment variables
+    const requiredEnvVars = {
+      DATABASE_URL: process.env.DATABASE_URL,
+      VITE_SUPABASE_URL: process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL,
+      VITE_SUPABASE_ANON_KEY: process.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY,
+    };
+
+    const missingVars = Object.entries(requiredEnvVars)
+      .filter(([_, value]) => !value)
+      .map(([key]) => key);
+
+    if (missingVars.length > 0) {
+      const errorMsg = `Missing required environment variables: ${missingVars.join(", ")}. Please set these in your Vercel project settings.`;
+      log(errorMsg, "error");
+      throw new Error(errorMsg);
+    }
+
+    log("Environment variables validated successfully", "express");
+
     // 1. Core setup
     await registerRoutes(httpServer, app);
 

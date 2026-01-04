@@ -35,7 +35,13 @@ export async function registerRoutes(
       res.json(metrics);
     } catch (error) {
       console.error("Error in /api/dashboard/metrics:", error);
-      res.status(500).json({ error: "Failed to fetch dashboard metrics" });
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      const errorStack = error instanceof Error ? error.stack : undefined;
+      console.error("Full error details:", { errorMessage, errorStack });
+      res.status(500).json({ 
+        error: "Failed to fetch dashboard metrics",
+        details: process.env.NODE_ENV === "development" ? errorMessage : undefined
+      });
     }
   });
 
@@ -46,7 +52,13 @@ export async function registerRoutes(
       res.json(revenue);
     } catch (error) {
       console.error("Error in /api/dashboard/revenue:", error);
-      res.status(500).json({ error: "Failed to fetch revenue data" });
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      const errorStack = error instanceof Error ? error.stack : undefined;
+      console.error("Full error details:", { errorMessage, errorStack });
+      res.status(500).json({ 
+        error: "Failed to fetch revenue data",
+        details: process.env.NODE_ENV === "development" ? errorMessage : undefined
+      });
     }
   });
 
@@ -57,7 +69,13 @@ export async function registerRoutes(
       res.json(activities);
     } catch (error) {
       console.error("Error in /api/dashboard/activities:", error);
-      res.status(500).json({ error: "Failed to fetch activities" });
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      const errorStack = error instanceof Error ? error.stack : undefined;
+      console.error("Full error details:", { errorMessage, errorStack });
+      res.status(500).json({ 
+        error: "Failed to fetch activities",
+        details: process.env.NODE_ENV === "development" ? errorMessage : undefined
+      });
     }
   });
 
@@ -91,7 +109,13 @@ export async function registerRoutes(
       res.json(properties);
     } catch (error) {
       console.error("Error in /api/properties:", error);
-      res.status(500).json({ error: "Failed to fetch properties" });
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      const errorStack = error instanceof Error ? error.stack : undefined;
+      console.error("Full error details:", { errorMessage, errorStack });
+      res.status(500).json({ 
+        error: "Failed to fetch properties",
+        details: process.env.NODE_ENV === "development" ? errorMessage : undefined
+      });
     }
   });
 
@@ -118,7 +142,14 @@ export async function registerRoutes(
       const property = await storage.createProperty(parsed.data, userId);
       res.status(201).json(property);
     } catch (error) {
-      res.status(500).json({ error: "Failed to create property" });
+      console.error("Error in POST /api/properties:", error);
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      const errorStack = error instanceof Error ? error.stack : undefined;
+      console.error("Full error details:", { errorMessage, errorStack });
+      res.status(500).json({ 
+        error: "Failed to create property",
+        details: process.env.NODE_ENV === "development" ? errorMessage : undefined
+      });
     }
   });
 
@@ -155,7 +186,14 @@ export async function registerRoutes(
       const tenants = await storage.getAllTenants(userId);
       res.json(tenants);
     } catch (error) {
-      res.status(500).json({ error: "Failed to fetch tenants" });
+      console.error("Error in /api/tenants:", error);
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      const errorStack = error instanceof Error ? error.stack : undefined;
+      console.error("Full error details:", { errorMessage, errorStack });
+      res.status(500).json({ 
+        error: "Failed to fetch tenants",
+        details: process.env.NODE_ENV === "development" ? errorMessage : undefined
+      });
     }
   });
 
@@ -182,7 +220,14 @@ export async function registerRoutes(
       const tenant = await storage.createTenant(parsed.data, userId);
       res.status(201).json(tenant);
     } catch (error) {
-      res.status(500).json({ error: "Failed to create tenant" });
+      console.error("Error in POST /api/tenants:", error);
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      const errorStack = error instanceof Error ? error.stack : undefined;
+      console.error("Full error details:", { errorMessage, errorStack });
+      res.status(500).json({ 
+        error: "Failed to create tenant",
+        details: process.env.NODE_ENV === "development" ? errorMessage : undefined
+      });
     }
   });
 
@@ -404,7 +449,13 @@ export async function registerRoutes(
       res.json(expenses);
     } catch (error) {
       console.error("Error in /api/expenses:", error);
-      res.status(500).json({ error: "Failed to fetch expenses" });
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      const errorStack = error instanceof Error ? error.stack : undefined;
+      console.error("Full error details:", { errorMessage, errorStack });
+      res.status(500).json({ 
+        error: "Failed to fetch expenses",
+        details: process.env.NODE_ENV === "development" ? errorMessage : undefined
+      });
     }
   });
 
@@ -431,7 +482,14 @@ export async function registerRoutes(
       const expense = await storage.createExpense(parsed.data, userId);
       res.status(201).json(expense);
     } catch (error) {
-      res.status(500).json({ error: "Failed to create expense" });
+      console.error("Error in POST /api/expenses:", error);
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      const errorStack = error instanceof Error ? error.stack : undefined;
+      console.error("Full error details:", { errorMessage, errorStack });
+      res.status(500).json({ 
+        error: "Failed to create expense",
+        details: process.env.NODE_ENV === "development" ? errorMessage : undefined
+      });
     }
   });
 

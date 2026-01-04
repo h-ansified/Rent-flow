@@ -8,8 +8,15 @@ import bcrypt from "bcrypt";
 const router = Router();
 
 // Initialize Supabase client for auth verification
-const supabaseUrl = process.env.VITE_SUPABASE_URL!;
-const supabaseKey = process.env.VITE_SUPABASE_ANON_KEY!;
+const supabaseUrl = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
+const supabaseKey = process.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY;
+
+if (!supabaseUrl || !supabaseKey) {
+    console.error("CRITICAL: Missing Supabase environment variables!");
+    console.error("Required: VITE_SUPABASE_URL (or SUPABASE_URL) and VITE_SUPABASE_ANON_KEY (or SUPABASE_ANON_KEY)");
+    throw new Error("Missing required Supabase environment variables. Please set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY in your environment.");
+}
+
 const supabase = createClient(supabaseUrl, supabaseKey);
 
 // Extend Express Request type to include user

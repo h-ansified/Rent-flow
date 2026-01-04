@@ -32,29 +32,39 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     useEffect(() => {
         // Get initial session
-        supabase.auth.getSession().then(({ data: { session } }) => {
-            if (session?.user) {
-                const metadata = session.user.user_metadata;
-                setUser({
-                    id: session.user.id,
-                    email: session.user.email!,
-                    username: metadata.username || session.user.email!.split('@')[0],
-                    // Defaults for required fields
-                    password: "",
-                    firstName: metadata.firstName || null,
-                    lastName: metadata.lastName || null,
-                    phone: metadata.phone || null,
-                    companyName: metadata.companyName || null,
-                    businessEmail: metadata.businessEmail || null,
-                    businessAddress: metadata.businessAddress || null,
-                    currency: metadata.currency || "KES",
-                    profilePhotoUrl: metadata.profilePhotoUrl || null,
-                    createdAt: new Date(session.user.created_at),
-                    updatedAt: new Date(session.user.updated_at || new Date()),
-                } as User);
-            }
-            setIsLoading(false);
-        });
+        supabase.auth.getSession()
+            .then(({ data: { session }, error }) => {
+                if (error) {
+                    console.error("Error getting session:", error);
+                    setIsLoading(false);
+                    return;
+                }
+                if (session?.user) {
+                    const metadata = session.user.user_metadata;
+                    setUser({
+                        id: session.user.id,
+                        email: session.user.email!,
+                        username: metadata.username || session.user.email!.split('@')[0],
+                        // Defaults for required fields
+                        password: "",
+                        firstName: metadata.firstName || null,
+                        lastName: metadata.lastName || null,
+                        phone: metadata.phone || null,
+                        companyName: metadata.companyName || null,
+                        businessEmail: metadata.businessEmail || null,
+                        businessAddress: metadata.businessAddress || null,
+                        currency: metadata.currency || "KES",
+                        profilePhotoUrl: metadata.profilePhotoUrl || null,
+                        createdAt: new Date(session.user.created_at),
+                        updatedAt: new Date(session.user.updated_at || new Date()),
+                    } as User);
+                }
+                setIsLoading(false);
+            })
+            .catch((error) => {
+                console.error("Failed to get session:", error);
+                setIsLoading(false);
+            });
 
         // Listen for auth changes
         const {

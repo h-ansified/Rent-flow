@@ -123,6 +123,7 @@ function TableSkeleton() {
 }
 
 export default function Tenants() {
+  const { user } = useAuth();
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -155,7 +156,6 @@ export default function Tenants() {
     },
   });
 
-  const { user } = useAuth();
   const currencySymbol = user?.currency || "KSH";
 
   const createMutation = useMutation({

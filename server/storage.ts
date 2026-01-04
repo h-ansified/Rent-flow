@@ -379,7 +379,7 @@ class DatabaseStorage {
   async getDashboardMetrics(userId: string): Promise<DashboardMetrics> {
     await this.updateOverduePayments(userId);
     // Get counts and sums using SQL aggregation
-    const [propertyStats] = await db
+    const [maybePropertyStats] = await db
       .select({
         totalProperties: sql<number>`COUNT(*)::int`,
         totalUnits: sql<number>`COALESCE(SUM(${properties.units}), 0)::int`,
@@ -389,7 +389,7 @@ class DatabaseStorage {
       .from(properties)
       .where(eq(properties.userId, userId));
 
-    const [paymentStats] = await db
+    const [maybePaymentStats] = await db
       .select({
         pendingPayments: sql<number>`COUNT(CASE WHEN ${payments.status} = 'pending' THEN 1 END)::int`,
         overduePayments: sql<number>`COUNT(CASE WHEN ${payments.status} = 'overdue' THEN 1 END)::int`,
@@ -397,12 +397,16 @@ class DatabaseStorage {
       .from(payments)
       .where(eq(payments.userId, userId));
 
-    const [maintenanceStats] = await db
+    const [maybeMaintenanceStats] = await db
       .select({
         openRequests: sql<number>`COUNT(CASE WHEN ${maintenanceRequests.status} != 'completed' THEN 1 END)::int`,
       })
       .from(maintenanceRequests)
       .where(eq(maintenanceRequests.userId, userId));
+
+    const propertyStats = maybePropertyStats || { totalProperties: 0, totalUnits: 0, occupiedUnits: 0, monthlyRevenue: 0 };
+    const paymentStats = maybePaymentStats || { pendingPayments: 0, overduePayments: 0 };
+    const maintenanceStats = maybeMaintenanceStats || { openRequests: 0 };
 
     const occupancyRate =
       propertyStats.totalUnits > 0
@@ -570,7 +574,7 @@ class DatabaseStorage {
         id: `exp-${e.id}`,
         type: "maintenance" as const, // Categorize expenses under maintenance for icon consistency
         description: `Expense Recorded: ${e.title} (${e.amount})`,
-        timestamp: e.createdAt.toISOString(),
+        timestamp: new Date(e.createdAt).toISOString(),
         propertyId: e.propertyId || undefined,
       })),
       ...newTenants.map((t) => ({
